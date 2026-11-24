@@ -1,0 +1,805 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1f6f4a">
+<title>現場モニタリング</title>
+<style>
+:root{
+  --bg:#f6f7f4;--card:#fff;--ink:#1d2a22;--sub:#5d6b62;--line:#d9dfd8;
+  --main:#1f6f4a;--main-ink:#fff;--warn:#c2410c;--warn-bg:#fff1e6;--ok:#15803d;--band:rgba(31,111,74,.12);
+  --c1:#1f6f4a;--c2:#2563eb;--c3:#d97706;--c4:#7c3aed;--prev:#9aa59e;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){--bg:#121a15;--card:#1b2620;--ink:#e8efe9;--sub:#9db0a3;--line:#2f3d34;
+  --main:#4ade80;--main-ink:#08210f;--warn:#fb923c;--warn-bg:#3a2411;--ok:#4ade80;--band:rgba(74,222,128,.14);
+  --c1:#4ade80;--c2:#60a5fa;--c3:#fbbf24;--c4:#a78bfa;--prev:#7f8d84}
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,"Hiragino Sans","Yu Gothic UI",sans-serif;padding-bottom:84px}
+header{position:sticky;top:0;z-index:5;background:var(--main);color:var(--main-ink);padding:10px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+header h1{font-size:17px;margin:0;flex:1;min-width:140px}
+header input[type=date]{font:inherit;padding:4px 8px;border-radius:8px;border:0}
+main{max-width:860px;margin:0 auto;padding:12px 16px}
+nav.tabs{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--line);display:flex;z-index:6;padding-bottom:env(safe-area-inset-bottom)}
+nav.tabs button{flex:1;border:0;background:none;color:var(--sub);padding:12px 4px;font:inherit;font-size:14px;min-height:56px}
+nav.tabs button[aria-selected=true]{color:var(--main);font-weight:700;box-shadow:inset 0 3px 0 var(--main)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin:12px 0}
+.card h2{font-size:16px;margin:0 0 8px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg button,.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:10px 14px;font:inherit;min-height:44px;cursor:pointer}
+.seg button[aria-pressed=true]{background:var(--main);color:var(--main-ink);border-color:var(--main);font-weight:700}
+.btn.primary{background:var(--main);color:var(--main-ink);border-color:var(--main);font-weight:700}
+.btn.small{min-height:34px;padding:4px 10px;font-size:14px}
+input:not([type]),input[type=text],input[type=number],input[type=search],select,textarea{font:inherit;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);width:100%}
+input.big{font-size:26px;text-align:center;letter-spacing:2px}
+label{font-size:13px;color:var(--sub);display:block;margin-bottom:2px}
+.grid{display:grid;gap:8px}
+.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:repeat(3,1fr)}.g4{grid-template-columns:repeat(4,1fr)}
+.grid>div{min-width:0}
+@media (max-width:560px){.g4{grid-template-columns:1fr 1fr}}
+#main td select{max-width:150px}
+.pad{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.pad button{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;min-height:48px;font:inherit;font-size:18px}
+.pad button[aria-pressed=true]{background:var(--main);color:var(--main-ink);font-weight:700}
+.pad.five{grid-template-columns:repeat(5,1fr)}
+.prev{background:var(--band);border-radius:10px;padding:8px 10px;font-size:14px;margin:8px 0;min-height:38px}
+.flag{color:var(--warn);font-weight:700}.okc{color:var(--ok);font-weight:700}
+.muted{color:var(--sub);font-size:13px}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+.scroll{overflow-x:auto}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px}
+.kpi{background:var(--bg);border-radius:10px;padding:8px 10px}
+.kpi b{display:block;font-size:22px}
+.warnbox{background:var(--warn-bg);border:1px solid var(--warn);border-radius:10px;padding:8px 10px;margin:8px 0;font-size:14px}
+svg text{fill:var(--sub);font-size:11px}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:13px;color:var(--sub)}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+.tag{font-size:11px;border-radius:6px;padding:1px 6px;background:var(--warn-bg);color:var(--warn);margin-left:4px}
+.hide{display:none!important}
+.banner{background:var(--warn-bg);color:var(--warn);padding:8px 16px;text-align:center;font-size:14px}
+pre.out{white-space:pre-wrap;background:var(--bg);border-radius:10px;padding:10px;font:14px/1.6 ui-monospace,Consolas,monospace}
+@media print{
+  header,nav.tabs,.noprint,.banner{display:none!important}
+  body{background:#fff;color:#000;padding:0}.card{break-inside:avoid;border-color:#bbb}
+  .printonly{display:block!important}
+}
+.printonly{display:none}
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">現場モニタリング</h1>
+  <input type="date" id="date" aria-label="記録日">
+</header>
+<div id="banner" class="banner hide"></div>
+<main id="main"></main>
+<nav class="tabs" role="tablist" id="tabs"></nav>
+
+<script>
+"use strict";
+/* ============================================================
+   現場モニタリング（糞洗い・PSPS・BCS/ルーメンフィル・胸囲→体重）
+   1農家 = 1アプリ。データは端末の中だけ（localStorage）。サーバーへは送らない。
+   ?farm=<農家ID> で農家ごとに保存先を分ける（混ざらない）。
+   ============================================================ */
+const Q = new URLSearchParams(location.search);
+const FARM_ID = (Q.get('farm') || 'default').replace(/[^\w\-]/g,'').slice(0,40) || 'default';
+const KEY = 'genba-monitor:' + FARM_ID;
+
+const KINDS = {
+  bcs:   {label:'BCS・RF',  icon:'🐄'},
+  chest: {label:'胸囲',     icon:'📏'},
+  feces: {label:'糞洗い',   icon:'💩'},
+  psps:  {label:'PSPS',     icon:'🧪'},
+};
+/* 目安は文献の仮置き。農家・獣医師の判断で設定から直す。出典: リサーチ\2026-11-09_PSPSと糞洗いの目安.md */
+const DEFAULT_TARGETS = {
+  feces:{top:[0,10], mid:[0,20], bot:[50,100]},               // NWF Agriculture（要確認）
+  psps: {top:[2,8], mid:[30,50], low:[30,50], tray:[0,20]},   // 19/8/1.18mm（Penn State DAS 02-42・要確認）
+  bcs:  [2.75,3.75],                                          // 分布図の帯＝Oikawa/Fetrow の帯の最小〜最大（判定はステージ別）
+  bcsJump:0.5,
+  mbw:680,          // 成牛体重（kg）。牧場の経産牛の平均に直す（要確認）
+  adg:[0.7,1.0],    // 育成の増体 kg/日（大型品種 約0.8、Merck獣医マニュアル）
+};
+/* 1頭のBCS・RFを、ステージの指標で判定 → [{t:'文',lv:'warn'|'ok'}] */
+function judgeBcs(r, prev){
+  const st=STAGES[r.stage||'none']; const out=[]; const band=bcsBand(r.stage,r.dim);
+  if(!band) return out;
+  if(r.bcs!=null){
+    if(r.bcs>band[1]+1e-9) out.push({t:'帯より高い（'+bandTxt(band)+'）',lv:'warn'});
+    else if(r.bcs<band[0]-1e-9) out.push({t:'帯より低い（'+bandTxt(band)+'）',lv:'warn'});
+    if(st.loss!=null&&prev&&prev.bcs!=null){ const d=r.bcs-prev.bcs; if(d<-st.loss-1e-9||(st.loss===0&&d<0)) out.push({t:'前回から '+d.toFixed(2)+' 低下',lv:'warn'}); }
+  }
+  if(r.rf!=null&&st.rf&&r.rf<st.rf) out.push({t:'RF '+r.rf+'（'+st.rf+'未満＝採食不足？）',lv:'warn'});
+  return out;
+}
+/* ステージと帯は当院の月次レポートと同じ（2026-11-22 獣医師の判断「Oikawa/Fetrowの図で行こう」）
+   BCS：乾乳は 3.25〜3.75 で一定。泌乳中は 分娩0日 3.25〜3.75 → 50日 2.75〜3.25 → 300日 3.25〜3.75 の線
+   （Plot of Body Condition Scores by Days in Milk、S. Oikawa・原表 J. Fetrow）。
+   判定は1頭ずつ、その牛の分娩後日数での帯（個体情報で分かるとき）。分からないときはステージの真ん中の日数での帯。
+   rf: これ未満は採食不足の注意（月次レポートの RFS の範囲の下限。一般的な目安）。loss: BCS低下の注意（文献：Carvalho 2014） */
+const BCS_DRY=[3.25,3.75];
+const BCS_LINE=[[0,3.25,3.75],[50,2.75,3.25],[300,3.25,3.75]];
+const STAGES = {
+  far:   {label:'乾乳前期', range:'分娩予定の60〜21日前', dry:true, rf:4,   note:'BCS 3.25〜3.75（Oikawa/Fetrow）。RF 4〜5（月次レポートの目安）'},
+  close: {label:'乾乳後期', range:'分娩予定の20日前〜',   dry:true, rf:3.5, note:'BCS 3.25〜3.75（同上）。RF 3.5〜5。分娩前のRF低下は初回授精の不受胎と関連（Kawashima 2016）'},
+  fresh: {label:'フレッシュ', range:'分娩後0〜30日',   dim:[0,30],    rf:2, loss:0,   note:'BCSは分娩0日 3.25〜3.75 から線で下がる。分娩〜3週のBCS低下で初回授精の受胎率が下がる（低下22.8%・維持36.0%・増加78.3%、Carvalho 2014）→ 低下で注意。RF 2〜3（出典が弱い・仮）'},
+  peak:  {label:'泌乳最盛期', range:'分娩後31〜150日', dim:[31,150],  rf:3, loss:0.5, note:'BCSは50日 2.75〜3.25 が底。授精時BCS 2.50以下で受胎率低下（40.4% 対 49.2%、Carvalho 2014）。0.5を超える低下で注意。RF 3〜4'},
+  late:  {label:'泌乳中後期', range:'分娩後151日〜',   dim:[151,300], rf:3,             note:'BCSは300日 3.25〜3.75 へ線で戻す。RF 3〜4'},
+  none:  {label:'ステージ不明', note:'ステージを選ぶか、個体情報（分娩日・分娩予定日）を入れると判定が出ます'},
+};
+/* その牛の BCS の帯 [下, 上]。乾乳は一定、泌乳中は分娩後日数で線をなぞる */
+function bcsBand(stage,dim){
+  const st=STAGES[stage||'none']; if(!st||(!st.dry&&!st.dim)) return null;
+  if(st.dry) return BCS_DRY.slice();
+  const d=dim!=null&&dim>=0? dim : Math.round((st.dim[0]+st.dim[1])/2); const p=BCS_LINE;
+  if(d<=p[0][0]) return [p[0][1],p[0][2]];
+  for(let i=1;i<p.length;i++) if(d<=p[i][0]){ const f=(d-p[i-1][0])/(p[i][0]-p[i-1][0]); return [p[i-1][1]+(p[i][1]-p[i-1][1])*f, p[i-1][2]+(p[i][2]-p[i-1][2])*f]; }
+  return [p[p.length-1][1],p[p.length-1][2]];
+}
+const bandTxt = b => b[0].toFixed(2)+'〜'+b[1].toFixed(2);
+/* ステージの帯を文で（乾乳は一定、泌乳はステージの始まり→終わり） */
+function stageBandTxt(k){ const st=STAGES[k]; if(st.dry) return bandTxt(BCS_DRY); if(!st.dim) return '–';
+  const ds=[st.dim[0],...BCS_LINE.map(p=>p[0]).filter(x=>x>st.dim[0]&&x<st.dim[1]),st.dim[1]];   // 線の折れ目（50日）を挟む
+  return ds.map(x=>x+'日 '+bandTxt(bcsBand(k,x))).join(' → '); }
+/* 判定の帯の外か（ステージが分かればステージの帯、分からなければ全体の帯） */
+function outOfBand(r){ const b=bcsBand(r.stage,r.dim)||S.targets.bcs; return r.bcs<b[0]-1e-9||r.bcs>b[1]+1e-9; }
+const SAMPLES =['TMR（搾乳）・給与時','TMR（搾乳）・残飼','TMR（乾乳・育成）','草','サイレージ'];
+const estWeight = c => 0.0234*c*c - 2.281*c + 75.618;      // 当院の体高・体重の表の式（ホルスタイン育成牛）
+
+let S = load();
+let view = {tab:'in', kind:'bcs', date:today(), readonly:false, bcs:null, rf:null, shareText:''};
+
+function blank(){return {farm:FARM_ID, farmName:'', rows:[], roster:{}, targets:DEFAULT_TARGETS, v:1}}
+function load(){
+  try{const s=JSON.parse(localStorage.getItem(KEY)||'null'); if(s&&s.rows){s.targets=Object.assign({},DEFAULT_TARGETS,s.targets||{}); s.roster=s.roster||{};
+    s.rows.forEach(r=>{ if(r.stage&&!STAGES[r.stage]) r.stage=r.stage==='early'?'peak':'none'; });   // 2026-11-22 前の区切り（泌乳前期 early）→ 最盛期
+    return s;}}catch(e){}
+  return blank();
+}
+function save(){ if(view.readonly) return; try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){alert('保存できません（容量・プライベートモード）。「共有・設定」からバックアップを保存してください');} }
+function today(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+const esc = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const md = d => d? d.slice(5).replace('-','/') : '';
+const f1 = (x,n=1) => x==null||isNaN(x)? '–' : (+x).toFixed(n);
+const mean = a => a.length? a.reduce((s,x)=>s+x,0)/a.length : null;
+const uid = () => Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+
+/* ---------- データ取り出し ---------- */
+const rowsOf = (kind,date) => S.rows.filter(r=>r.kind===kind && (!date||r.date===date) && !r.del);
+const datesOf = kind => [...new Set(S.rows.filter(r=>r.kind===kind&&!r.del).map(r=>r.date))].sort();
+const allDates = () => [...new Set(S.rows.filter(r=>!r.del).map(r=>r.date))].sort();
+function prevDate(kind,date){const d=datesOf(kind).filter(x=>x<date);return d.length?d[d.length-1]:null}
+/* 同じ牛の「その日より前」の最新の記録 */
+function lastOfCow(kind,cow,date){
+  let best=null; for(const r of S.rows){ if(r.kind===kind&&!r.del&&r.cow===cow&&r.date<date&&(!best||r.date>best.date||(r.date===best.date&&r.ts>best.ts))) best=r;} return best;
+}
+function lastOfSample(kind,sample,date){
+  let best=null; for(const r of S.rows){ if(r.kind===kind&&!r.del&&(r.sample||'')===(sample||'')&&r.date<date&&(!best||r.date>best.date||(r.date===best.date&&r.ts>best.ts))) best=r;} return best;
+}
+const cowLabel = c => { const r=S.roster[c]; return c + (r&&r.id10? '' : ''); };
+
+/* ---------- 個体情報（TAF・ファームノートの CSV） ----------
+   TAF「在籍牛一覧」（耳標ID・最新分娩日・分娩予定日）、TAF「CSV出力（在籍）」（個体識別番号_10桁・_4桁）、
+   ファームノート「牛の一覧」（個体識別番号・耳標番号・最終分娩日・分娩予定日・一般ステータス）を見出しの名前で読む。
+   列の名前は 繁殖管理アプリ（DC305\繁殖管理アプリ\src\core.js の parseTAF・parseFN）と同じ。 */
+const RCOL = {
+  id10:['耳標ID','個体識別番号_10桁','個体識別番号','個体識別番号(10桁)'],
+  id4:['個体識別番号_4桁','拡大4桁','耳標番号','耳標番号(自家指定)','牛番号','管理番号'],
+  birth:['生年月日','出生日'], lact:['産次'], fresh:['最新分娩日','最終分娩日','分娩日'], due:['分娩予定日'],
+  status:['一般ステータス','状態'], repro:['繁殖ステータス','繁殖状態'], breed:['品種','品種名'], sex:['性別'], name:['名号','名前'],
+  left:['売却_廃用日','死亡日','除籍日','転出日','売却日'],
+};
+function csvParse(t){ const rows=[]; let row=[],f='',q=false;
+  for(let i=0;i<t.length;i++){ const c=t[i];
+    if(q){ if(c==='"'){ if(t[i+1]==='"'){f+='"';i++} else q=false } else f+=c; }
+    else if(c==='"') q=true; else if(c===','){row.push(f);f=''} else if(c==='\n'){row.push(f);rows.push(row);row=[];f=''} else if(c!=='\r') f+=c; }
+  if(f!==''||row.length){row.push(f);rows.push(row)} return rows; }
+const nk = s => String(s==null?'':s).normalize('NFKC').replace(/\s/g,'');
+function isoDate(v){ v=String(v||'').normalize('NFKC').trim(); if(!v) return null;
+  let m=v.match(/^(\d{4})[\/\-.年](\d{1,2})[\/\-.月](\d{1,2})/)||v.match(/^(\d{4})(\d{2})(\d{2})$/);
+  if(!m||+m[1]<1980||+m[1]>2100) return null; return m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0'); }
+function id10Of(v){ let s=String(v||'').normalize('NFKC').replace(/\D/g,''); if(s.length===9) s='0'+s; return s.length===10? s : null; }
+/* CSV の文字 → {src, rows:[{id10,id4,birth,lact,fresh,due,status,...,left}]} */
+function parseRosterCsv(text){
+  const all=csvParse(String(text).replace(/^﻿/,'')); let hi=-1, head=null;
+  for(let i=0;i<Math.min(all.length,20);i++){ const h=all[i].map(nk); if(RCOL.id10.some(n=>h.includes(n))){hi=i;head=h;break} }
+  if(hi<0) throw new Error('見出しに「耳標ID」か「個体識別番号」がありません（TAF・ファームノートの牛の一覧の CSV を選んでください）');
+  const ix=k=>{ for(const n of RCOL[k]){ const i=head.indexOf(nk(n)); if(i>=0) return i; } return -1; };
+  const I={}; Object.keys(RCOL).forEach(k=>{ if(k!=='left') I[k]=ix(k); });
+  const leftIx=RCOL.left.map(n=>head.indexOf(nk(n))).filter(i=>i>=0);
+  const src=head.includes('耳標ID')?'TAF 在籍牛一覧':head.includes('個体識別番号_10桁')?'TAF CSV出力':(head.includes('一般ステータス')||head.includes(nk('耳標番号(自家指定)'))||head.includes('出生日'))?'ファームノート':'牛の一覧';
+  const get=(r,k)=>I[k]>=0&&I[k]<r.length? String(r[I[k]]).trim() : '';
+  const rows=[];
+  for(const r of all.slice(hi+1)){
+    if(!r.some(x=>String(x).trim())) continue;
+    const id10=id10Of(get(r,'id10')); let id4=null; const e=get(r,'id4').normalize('NFKC');
+    if(e){ const pm=e.match(/\((\d+)\)/); const dg=pm?pm[1]:e.replace(/\D/g,''); if(dg.length>=1&&dg.length<=4) id4=dg.padStart(4,'0'); else if(dg.length===10) id4=dg.slice(5,9); }
+    if(!id4&&id10) id4=id10.slice(5,9);          // 牛番号4桁＝10桁の6〜9桁目（末尾は検査用の数字）
+    if(!id4) continue;
+    const st=get(r,'status');
+    const left=leftIx.some(i=>String(r[i]||'').trim())||/除籍|売却|死亡|廃用|転出/.test(st);
+    const lact=get(r,'lact');
+    rows.push({id10,id4,birth:isoDate(get(r,'birth')),lact:lact!==''&&!isNaN(+lact)?+lact:null,fresh:isoDate(get(r,'fresh')),due:isoDate(get(r,'due')),
+      status:st,repro:get(r,'repro'),breed:get(r,'breed'),sex:get(r,'sex'),name:get(r,'name'),left});
+  }
+  return {src,rows,hasFresh:I.fresh>=0,hasDue:I.due>=0};
+}
+/* 読んだ一覧 → 4桁の対応表。居なくなった牛は入れない。4桁が重なる牛は外す（4桁だけで記録を持つので、どちらか決められない） */
+function rosterFrom(p){
+  const cur=p.rows.filter(r=>!r.left); const by={}, dup=new Set();
+  cur.forEach(r=>{ if(by[r.id4]) dup.add(r.id4); by[r.id4]=r; });
+  dup.forEach(k=>delete by[k]);
+  const out={}; Object.values(by).forEach(r=>{ out[r.id4]={id10:r.id10,birth:r.birth,lact:r.lact,fresh:r.fresh,due:r.due,status:r.status,repro:r.repro,breed:r.breed,sex:r.sex}; });
+  return {roster:out,dup:[...dup].sort(),left:p.rows.length-cur.length};
+}
+/* 個体情報から、測った日のステージと分娩後日数を決める（月次レポートの区切りと同じ）。
+   乾乳：分娩予定まで60日以内（または状態が乾乳）、20日以内が乾乳後期。泌乳：最新分娩日から 〜30・31〜150・151日〜。
+   決められないとき（育成・予定日を過ぎた・一覧より後の分娩）は stage:null と理由。 */
+function autoStage(cow,date){
+  const ro=S.roster&&S.roster[cow]; if(!ro) return null;
+  const dd=x=>Math.round((new Date(date)-new Date(x))/864e5);
+  const dim=ro.fresh? dd(ro.fresh) : null, toDue=ro.due? -dd(ro.due) : null;
+  const parity=ro.lact!=null? (ro.lact>=1? ro.lact+'産':'未経産') : '';
+  const base={dim:null,toDue,parity};
+  if(dim!=null&&dim<0) return Object.assign(base,{stage:null,why:'個体情報の分娩日（'+ro.fresh+'）が測った日より後'});
+  if(toDue!=null&&toDue<0&&!(ro.fresh&&ro.fresh>=ro.due)){
+    // 一覧が測った日の3日前より新しく、予定を21日以内しか過ぎていなければ、まだ産んでいない乾乳後期の牛
+    const I=S.rosterInfo, ld=I&&(I.fileDate||I.date), fresh=ld&&dd(ld)<=3;
+    if(fresh&&-toDue<=21) return Object.assign(base,{stage:'close',why:'分娩予定日（'+ro.due+'）を'+(-toDue)+'日過ぎて未分娩（'+ld+' の一覧）'});
+    return Object.assign(base,{stage:null,why:-toDue>21? '分娩予定日（'+ro.due+'）を'+(-toDue)+'日過ぎています（流産・記録漏れを確かめる）' : '分娩予定日（'+ro.due+'）を過ぎています。個体情報を新しく'});
+  }
+  const dry=/乾乳/.test((ro.status||'')+(ro.repro||'')), milking=!dry&&/搾乳/.test(ro.status||'');   // ファームノートの一般ステータスがあれば優先
+  if(milking&&dim!=null) return Object.assign(base,{stage:dim<=30?'fresh':dim<=150?'peak':'late',dim,why:'分娩後'+dim+'日（状態：'+ro.status+'）'});
+  if((toDue!=null&&toDue>=0&&toDue<=60)||dry) return Object.assign(base,{stage:toDue!=null&&toDue<=20?'close':'far',why:toDue!=null?'分娩予定まで'+toDue+'日':'状態が乾乳（予定日なし）'});
+  if(dim!=null) return Object.assign(base,{stage:dim<=30?'fresh':dim<=150?'peak':'late',dim,why:'分娩後'+dim+'日'});
+  return Object.assign(base,{stage:null,why:ro.lact===0||ro.lact==null?'分娩の記録なし（育成・未経産）':'分娩日が一覧に無い'});
+}
+
+/* ---------- 音声・文字起こしの読み取り ----------
+   「1772 2.75 ルーメンフィルスコア2」「1890 3.0の4」「1853 胸囲182」のような言い方を拾う。
+   牛の4桁が出てきたところで区切り、次の4桁までを1頭ぶんとして読む。 */
+function parseVoice(text){
+  let t = String(text||'').replace(/[０-９．]/g,ch=>ch==='．'?'.':String.fromCharCode(ch.charCodeAt(0)-0xFEE0))
+    .replace(/(\d)\s*(?:点|ポイント)\s*(\d)/g,'$1.$2').replace(/\s+/g,' ');
+  const re=/(?<![\d.])(\d{4})(?![\d年]|\.\d)/g; const hits=[]; let m;
+  while((m=re.exec(t))) hits.push({cow:m[1],start:m.index,end:re.lastIndex});
+  const byCow = new Map(); const out=[];
+  hits.forEach((h,i)=>{
+    const chunk = t.slice(h.end, i+1<hits.length? hits[i+1].start : t.length);
+    const row={kind:'bcs',cow:h.cow,bcs:null,rf:null,chest:null,raw:(h.cow+' '+chunk).trim().slice(0,60),warn:[]};
+    let c = chunk;
+    const mc = c.match(/胸囲\D{0,4}?(\d{2,3}(?:\.\d)?)/);
+    if(mc){ row.kind='chest'; row.chest=+mc[1]; if(row.chest<60||row.chest>250) row.warn.push('胸囲が範囲外'); }
+    else{
+      const rfm = c.match(/(?:ルーメン(?:フィル)?(?:スコア)?|RFS?)[^\d]{0,4}?([1-5])(?![\d.])/i);
+      if(rfm){ row.rf=+rfm[1]; c=c.replace(rfm[0],' '); }
+      let b=c.match(/(?<![\d.])([1-5]\.\d{1,2})(?!\d)/);
+      if(b) row.bcs=+b[1];
+      else{ const bi=c.match(/(?:BCS|ボディ[ぁ-んァ-ヶー]*スコア)[^\d]{0,3}([1-5])(?![\d.])/i); if(bi) row.bcs=+bi[1]; }
+      if(row.rf==null){ const no=c.match(/\d\s*の\s*([1-5])(?![\d.])/); if(no) row.rf=+no[1]; }
+      if(row.bcs==null && row.rf==null) return;           // 数字が無い（雑談）
+      if(row.bcs!=null && Math.abs(row.bcs*4-Math.round(row.bcs*4))>1e-6) row.warn.push('BCSが0.25刻みでない');
+    }
+    const k=row.kind+':'+row.cow;
+    if(byCow.has(k)){ const p=byCow.get(k);                // 同じ牛が2回 → 足りない所だけ補う
+      for(const f of ['bcs','rf','chest']){ if(p[f]==null&&row[f]!=null) p[f]=row[f]; else if(row[f]!=null&&p[f]!==row[f]) p.warn.push('同じ牛で値が違う（'+f+'）'); }
+    } else { byCow.set(k,row); out.push(row); }
+  });
+  out.forEach(r=>{ if(r.kind==='bcs'){ if(r.bcs==null) r.warn.push('BCSなし'); if(r.rf==null) r.warn.push('RFなし'); } });
+  return out;
+}
+
+/* ---------- 画面の骨組み ---------- */
+const TABS=[['in','入力','✍️'],['voice','音声','🎙'],['res','結果','📊'],['cmp','過去比較','📈'],['share','共有・設定','📤']];
+function renderTabs(){
+  const list = view.readonly? TABS.filter(t=>t[0]==='res'||t[0]==='cmp') : TABS;
+  document.getElementById('tabs').innerHTML = list.map(([k,l,i])=>`<button role="tab" aria-selected="${view.tab===k}" data-tab="${k}">${i}<br>${l}</button>`).join('');
+}
+function render(){
+  document.getElementById('title').textContent = (S.farmName? S.farmName+' ':'') + '現場モニタリング';
+  document.title = (S.farmName||'農家')+' 現場モニタリング';
+  const dEl=document.getElementById('date'); dEl.value=view.date; dEl.disabled=view.readonly;
+  renderTabs();
+  const m=document.getElementById('main');
+  m.innerHTML = ({in:vIn,voice:vVoice,res:vRes,cmp:vCmp,share:vShare}[view.tab]||vIn)();
+  after();
+}
+document.getElementById('date').addEventListener('change',e=>{view.date=e.target.value||today();view.bcs=view.rf=null;render()});
+document.getElementById('tabs').addEventListener('click',e=>{const b=e.target.closest('button');if(b){view.tab=b.dataset.tab;render();window.scrollTo(0,0)}});
+
+/* ---------- 入力 ---------- */
+function kindSeg(){ return `<div class="seg" role="group" aria-label="測るもの">`+Object.entries(KINDS).map(([k,v])=>`<button data-kind="${k}" aria-pressed="${view.kind===k}">${v.icon} ${v.label}</button>`).join('')+`</div>`; }
+function stageSeg(){ return `<div class="seg" id="stageSeg">`+Object.entries(STAGES).map(([k,v])=>`<button data-stage="${k}" aria-pressed="${(view.stage||'none')===k}" class="small">${v.label}</button>`).join('')+`</div>`; }
+function vIn(){
+  const k=view.kind; let form='';
+  if(k==='bcs'){
+    const bcsVals=[]; for(let x=2;x<=4.5001;x+=0.25) bcsVals.push(x);
+    form=`<label>ステージ（個体情報で決まる牛は自動。決まらない牛にこれを使う）</label>${stageSeg()}
+    <label style="margin-top:8px">牛の4桁</label><input id="cow" class="big" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="1772"><div id="prevbox" class="prev muted">4桁を入れると前回が出ます</div>
+    <label style="margin-top:8px">BCS（0.25刻み）</label><div class="pad" id="bcsPad">${bcsVals.map(x=>`<button data-bcs="${x}" aria-pressed="${view.bcs===x}">${x.toFixed(2)}</button>`).join('')}</div>
+    <label style="margin-top:8px">ルーメンフィル（1〜5）</label><div class="pad five" id="rfPad">${[1,2,3,4,5].map(x=>`<button data-rf="${x}" aria-pressed="${view.rf===x}">${x}</button>`).join('')}</div>`;
+  } else if(k==='chest'){
+    form=`<div class="grid g2"><div><label>牛の4桁</label><input id="cow" class="big" inputmode="numeric" maxlength="4" autocomplete="off"></div>
+    <div><label>胸囲 cm</label><input id="chest" class="big" inputmode="decimal" autocomplete="off"></div></div>
+    <div id="prevbox" class="prev muted">胸囲を入れると推定体重が出ます</div>`;
+  } else {
+    const isF=k==='feces'; const u=view.unit==='%'?'%':'g';
+    const names=isF?[['top','上段 '+u],['mid','中段 '+u],['bot','下段 '+u]]:[['top','上段 19mm '+u],['mid','中段 8mm '+u],['low','下段 1.18mm '+u],['tray','受け皿 '+u]];
+    const used=[...new Set(S.rows.filter(r=>r.kind===k&&r.sample&&!r.del).map(r=>r.sample))];
+    const opts=[...new Set([...(isF?[]:SAMPLES),...used])];
+    form=`<label>${isF?'対象（群・牛）':'試料'}</label><input id="sample" list="samples" placeholder="${isF?'例：4号 搾乳 DIM30〜80':'例：TMR（搾乳）・給与時'}"><datalist id="samples">${opts.map(o=>`<option value="${esc(o)}">`).join('')}</datalist>
+    <div class="row" style="margin-top:8px"><span class="muted">入れる単位</span><div class="seg"><button data-unit="g" aria-pressed="${u==='g'}" class="small">g（重さ）</button><button data-unit="%" aria-pressed="${u==='%'}" class="small">%（計算済み）</button></div></div>
+    <p class="muted" style="margin:4px 0">${u==='g'?(isF?'各段に残った量（水を切った重さ）を g で。% は自動で出ます。':'各段の重さを g で（容器の重さは引く）。% は自動で出ます。'):'% で入れる（昔の記録など）。'}</p>
+    <div class="grid ${isF?'g3':'g4'}" style="margin-top:8px">${names.map(([f,l])=>`<div><label>${l}</label><input class="big" style="font-size:22px" id="f_${f}" inputmode="decimal" data-f="${f}"></div>`).join('')}</div>
+    <div id="prevbox" class="prev muted">数字を入れると前回との比較が出ます</div>`;
+  }
+  const today_rows=S.rows.filter(r=>r.date===view.date&&!r.del).sort((a,b)=>b.ts-a.ts);
+  return `<div class="card"><div class="noprint">${kindSeg()}</div><div style="margin-top:10px">${form}</div>
+   <div class="row" style="margin-top:12px"><button class="btn primary" id="saveBtn" style="flex:1">保存して次へ</button></div><div id="msg" class="muted" role="status"></div></div>
+   <div class="card"><h2>${md(view.date)} の記録 ${today_rows.length}件</h2>${recordList(today_rows)}</div>`;
+}
+function describe(r){
+  if(r.kind==='bcs') return `<b>${esc(r.cow)}</b> BCS ${f1(r.bcs,2)}${r.rf!=null?' ／ RF '+r.rf:''}`+(view.readonly?'':` <select data-setstage="${r.id}" style="width:auto;padding:2px 4px;font-size:12px">${Object.entries(STAGES).map(([k,v])=>`<option value="${k}" ${(r.stage||'none')===k?'selected':''}>${v.label}</option>`).join('')}</select>`);
+  if(r.kind==='chest') return `<b>${esc(r.cow)}</b> 胸囲 ${f1(r.chest,0)}cm → 推定 ${f1(r.wt,0)}kg`;
+  const v=r.v||{}; const parts=r.kind==='feces'?['top','mid','bot']:['top','mid','low','tray'];
+  return `${esc(r.sample||'')} ${parts.map(p=>f1(v[p])).join(' / ')}%${r.g?' <span class="muted">（'+parts.map(p=>f1(r.g[p],0)).join('/')+'g）</span>':''}`;
+}
+function recordList(rows){
+  if(!rows.length) return '<p class="muted">まだありません</p>';
+  return `<div class="scroll"><table><tbody>${rows.slice(0,40).map(r=>`<tr><td>${KINDS[r.kind].icon} ${describe(r)}${r.src==='音声'&&!r.conf?'<span class="tag">音声・未確認</span>':''}</td>${view.readonly?'':`<td>${r.src==='音声'&&!r.conf?`<button class="btn small" data-conf="${r.id}">確認</button> `:''}<button class="btn small" data-del="${r.id}">消す</button></td>`}</tr>`).join('')}</tbody></table></div>`;
+}
+function pn(el){const v=el&&el.value.trim();return v===''||v==null?null:+v}
+function after(){
+  const m=document.getElementById('main');
+  if(view.tab==='in'){
+    const cow=document.getElementById('cow');
+    const upd=()=>{
+      const box=document.getElementById('prevbox'); if(!box) return;
+      if(view.kind==='bcs'&&cow){
+        const p=cow.value.length===4? lastOfCow('bcs',cow.value,view.date):null;
+        const a=cow.value.length===4? autoStage(cow.value,view.date):null; const sv=stageFor(a);
+        const hasRoster=Object.keys(S.roster||{}).length>0;
+        box.innerHTML = (cow.value.length<4? '4桁を入れると前回が出ます' : p? `前回 ${md(p.date)}：BCS <b>${f1(p.bcs,2)}</b>${p.rf!=null?' ／ RF <b>'+p.rf+'</b>':''}${p.stage&&p.stage!=='none'?'（'+STAGES[p.stage].label+'）':''}` : '前回の記録なし（初めて）')
+          + (cow.value.length<4? '' : a? `<br>個体情報：${a.stage?'<b>'+STAGES[a.stage].label+'</b>・':''}${esc(a.why)}${a.parity?'（'+a.parity+'）':''}${a.stage?'':'　→ 上で選んだステージで判定'}`
+             : hasRoster? '<br><span class="flag">個体情報に無い4桁です（番号を確かめる）</span>' : '')
+          + (cow.value.length===4&&sv.stage!=='none'? `<br>BCSの帯 ${bandTxt(bcsBand(sv.stage,sv.dim))}` : '')
+          + (view.bcs!=null||view.rf!=null? '<br>'+judgeHtml(judgeBcs({bcs:view.bcs,rf:view.rf,stage:sv.stage,dim:sv.dim},p),sv.stage) : '');
+      } else if(view.kind==='chest'&&cow){
+        const c=pn(document.getElementById('chest')); const p=cow.value.length===4? lastOfCow('chest',cow.value,view.date):null;
+        let s=''; if(c!=null) s+=`推定体重 <b>${f1(estWeight(c),0)}kg</b>　`;
+        if(p){ s+=`前回 ${md(p.date)}：${f1(p.chest,0)}cm／${f1(p.wt,0)}kg`; if(c!=null){const days=(new Date(view.date)-new Date(p.date))/864e5; const g=estWeight(c)-p.wt; s+=` → <b>${g>=0?'+':''}${f1(g,0)}kg</b>${days>0?`（${f1(g/days,2)}kg/日）`:''}`;} }
+        else if(cow.value.length===4) s+='前回の記録なし';
+        box.innerHTML = s||'胸囲を入れると推定体重が出ます';
+      } else if(view.kind==='feces'||view.kind==='psps'){
+        const vals=readSieve(); const smp=(document.getElementById('sample')||{}).value||'';
+        const p=lastOfSample(view.kind,smp,view.date); const parts=view.kind==='feces'?['top','mid','bot']:['top','mid','low','tray'];
+        let s=''; const sum=parts.reduce((a,x)=>a+(vals[x]||0),0);
+        if(view.unit!=='%'){
+          if(parts.some(x=>vals[x]!=null)){ const pc=toPct(vals,parts);
+            s+=`合計 <b>${f1(sum,0)}g</b>　→ `+parts.map((x,i)=>`${['上','中','下','皿'][i]} <b>${pc[x]==null?'–':f1(pc[x])}%</b>`).join('　');
+            if(parts.every(x=>vals[x]!=null)) s+='<br>'+sieveFlags(view.kind,pc); else s+='<br><span class="muted">全部の段を入れると判定します</span>'; }
+        } else if(parts.some(x=>vals[x]!=null)) s+=`合計 <b class="${Math.abs(sum-100)<=5?'okc':'flag'}">${f1(sum)}</b>%　`+sieveFlags(view.kind,vals);
+        s+= p? `<br>前回 ${md(p.date)}：${parts.map(x=>f1(p.v[x])).join(' / ')}`:'<br>前回の記録なし';
+        box.innerHTML=s;
+      }
+    };
+    m.addEventListener('input',upd); upd();
+    if(cow) cow.focus();
+  }
+  if(view.tab==='voice'){ wireVoice(); }
+}
+/* 記録に付けるステージ：個体情報で決まればそれ（分娩後日数も）、決まらなければ画面で選んだもの */
+function stageFor(a,fallback){ if(a&&a.stage) return {stage:a.stage,dim:a.dim,stageSrc:'個体情報'};
+  return {stage:fallback||view.stage||'none',dim:null,stageSrc:'選択'}; }
+function judgeHtml(js,stage){
+  if(!stage||stage==='none') return '<span class="muted">ステージを選ぶと判定が出ます</span>';
+  if(!js.length) return '<span class="okc">✓ 目安内</span>';
+  return js.map(j=>`<span class="${j.lv==='warn'?'flag':'muted'}">${j.lv==='warn'?'⚠ ':'△ '}${esc(j.t)}</span>`).join('　');
+}
+function toPct(g,parts){ const tot=parts.reduce((a,x)=>a+(g[x]||0),0); const o={}; parts.forEach(x=>{o[x]=g[x]==null||!tot?null:Math.round(g[x]/tot*1000)/10}); return o; }
+function readSieve(){const o={};document.querySelectorAll('[data-f]').forEach(e=>{o[e.dataset.f]=pn(e)});return o}
+function sieveFlags(kind,v){
+  const T=S.targets[kind]; const out=[]; const name={top:'上段',mid:'中段',bot:'下段',low:'下段',tray:'受け皿'};
+  for(const k in T){ if(v[k]==null) continue; const [lo,hi]=T[k]; if(v[k]<lo) out.push(`${name[k]}低め`); else if(v[k]>hi) out.push(`${name[k]}高め`); }
+  return out.length? `<span class="flag">⚠ ${out.join('・')}</span>` : (Object.keys(v).some(k=>v[k]!=null)?'<span class="okc">目安内</span>':'');
+}
+
+document.getElementById('main').addEventListener('click',e=>{
+  const t=e.target.closest('button'); if(!t) return;
+  if(t.dataset.kind){view.kind=t.dataset.kind;view.bcs=view.rf=null;render();return}
+  if(t.dataset.stage){view.stage=t.dataset.stage;document.querySelectorAll('#stageSeg button').forEach(b=>b.setAttribute('aria-pressed',b===t));const c=document.getElementById('cow');if(c)c.dispatchEvent(new Event('input',{bubbles:true}));return}
+  if(t.dataset.unit){view.unit=t.dataset.unit;render();return}
+  const poke=()=>{const c=document.getElementById('cow');if(c)c.dispatchEvent(new Event('input',{bubbles:true}))};
+  if(t.dataset.bcs){view.bcs=+t.dataset.bcs;document.querySelectorAll('#bcsPad button').forEach(b=>b.setAttribute('aria-pressed',b===t));poke();return}
+  if(t.dataset.rf){view.rf=view.rf===+t.dataset.rf?null:+t.dataset.rf;document.querySelectorAll('#rfPad button').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.rf===view.rf));poke();return}
+  if(t.id==='saveBtn'){saveEntry();return}
+  if(t.dataset.del){const r=S.rows.find(x=>x.id===t.dataset.del);if(r){r.del=true;save();render()}return}
+  if(t.dataset.conf){const r=S.rows.find(x=>x.id===t.dataset.conf);if(r){r.conf=true;save();render()}return}
+  if(t.dataset.go){view.tab=t.dataset.go;render();return}
+});
+function saveEntry(){
+  const msg=document.getElementById('msg'); const k=view.kind; const base={id:uid(),date:view.date,kind:k,src:'手入力',conf:true,ts:Date.now()};
+  if(k==='bcs'||k==='chest'){
+    const cow=document.getElementById('cow').value.trim(); if(!/^\d{4}$/.test(cow)){msg.innerHTML='<span class="flag">牛の4桁を入れてください</span>';return}
+    if(k==='bcs'){ if(view.bcs==null){msg.innerHTML='<span class="flag">BCSを選んでください</span>';return} Object.assign(base,{cow,bcs:view.bcs,rf:view.rf},stageFor(autoStage(cow,view.date))); }
+    else { const c=pn(document.getElementById('chest')); if(c==null||c<60||c>250){msg.innerHTML='<span class="flag">胸囲（60〜250cm）を入れてください</span>';return} Object.assign(base,{cow,chest:c,wt:estWeight(c)}); }
+    S.rows.push(base); save(); view.bcs=view.rf=null; render(); document.getElementById('msg').textContent='保存しました：'+cow;
+  } else {
+    let v=readSieve(); const parts=k==='feces'?['top','mid','bot']:['top','mid','low','tray'];
+    if(view.unit!=='%'){
+      if(parts.some(x=>v[x]==null||v[x]<0)){msg.innerHTML='<span class="flag">すべての段の重さ（g）を入れてください（何も残らない段は 0）</span>';return}
+      const tot=parts.reduce((a,x)=>a+v[x],0); if(!tot){msg.innerHTML='<span class="flag">合計が 0g です</span>';return}
+      Object.assign(base,{sample:document.getElementById('sample').value.trim(),v:toPct(v,parts),g:Object.assign({},v)});
+      S.rows.push(base); save(); render(); document.getElementById('msg').textContent='保存しました（合計 '+f1(tot,0)+'g）'; return;
+    }
+    if(k==='feces'&&v.bot==null&&v.top!=null&&v.mid!=null) v.bot=Math.round((100-v.top-v.mid)*10)/10;
+    if(k==='psps'&&v.tray==null&&parts.slice(0,3).every(x=>v[x]!=null)) v.tray=Math.round((100-v.top-v.mid-v.low)*10)/10;
+    if(parts.some(x=>v[x]==null)){msg.innerHTML='<span class="flag">すべての段を入れてください</span>';return}
+    const sum=parts.reduce((a,x)=>a+v[x],0); if(Math.abs(sum-100)>5 && !confirm(`合計が ${f1(sum)}% です。このまま保存しますか？`)) return;
+    Object.assign(base,{sample:document.getElementById('sample').value.trim(),v}); S.rows.push(base); save(); render(); document.getElementById('msg').textContent='保存しました';
+  }
+}
+
+/* ---------- 音声 ---------- */
+function vVoice(){
+  return `<div class="card"><h2>音声からの入力</h2>
+  <p class="muted">PLAUD などの文字起こしを貼るか、🎤で話します。「4桁 BCS 〜 ルーメンフィル 〜」の順（「1890 3.0の4」でも可）。胸囲は「1853 胸囲182」。読み取った結果は<b>確認してから</b>取り込みます。</p>
+  <div class="row"><button class="btn" id="micBtn">🎤 話す</button><label class="btn" style="margin:0">PLAUDのJSONを読む<input type="file" id="plaudFile" accept=".json,.txt" class="hide"></label></div>
+  <textarea id="vtext" rows="6" placeholder="ここに文字起こしを貼る"></textarea>
+  <div class="row" style="margin-top:8px"><button class="btn primary" id="parseBtn">読み取る</button></div></div>
+  <div id="vpreview"></div>`;
+}
+let vRows=[];
+function wireVoice(){
+  const ta=document.getElementById('vtext');
+  document.getElementById('parseBtn').onclick=()=>{vRows=parseVoice(ta.value);renderPreview()};
+  document.getElementById('plaudFile').onchange=async e=>{
+    const f=e.target.files[0]; if(!f) return; const txt=await f.text();
+    try{ const j=JSON.parse(txt); ta.value=(j.segments||[]).map(s=>s.content).join(' '); if(j.recording_name){const m=j.recording_name.match(/^(\d{4}-\d{2}-\d{2})/); if(m){view.date=m[1];document.getElementById('date').value=view.date}} }
+    catch(_){ ta.value=txt; }
+    vRows=parseVoice(ta.value); renderPreview();
+  };
+  const mic=document.getElementById('micBtn'); const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){mic.disabled=true;mic.textContent='🎤（この端末は非対応・貼り付けを使う）';return}
+  let rec=null;
+  mic.onclick=()=>{
+    if(rec){rec.stop();return}
+    rec=new SR(); rec.lang='ja-JP'; rec.continuous=true; rec.interimResults=false;
+    rec.onresult=ev=>{for(let i=ev.resultIndex;i<ev.results.length;i++) if(ev.results[i].isFinal) ta.value+=(ta.value?' ':'')+ev.results[i][0].transcript; vRows=parseVoice(ta.value);renderPreview()};
+    rec.onend=()=>{rec=null;mic.textContent='🎤 話す'}; rec.onerror=()=>{};
+    rec.start(); mic.textContent='⏹ 止める';
+  };
+}
+function renderPreview(){
+  const box=document.getElementById('vpreview'); if(!box) return;
+  if(!vRows.length){box.innerHTML='<div class="card muted">読み取れた牛がありません</div>';return}
+  const bad=vRows.filter(r=>r.warn.length).length;
+  box.innerHTML=`<div class="card"><h2>読み取り結果 ${vRows.length}頭 ${bad?`<span class="flag">（要確認 ${bad}）</span>`:''}</h2>
+  <div class="scroll"><table><thead><tr><th>取り込む</th><th>4桁</th><th>種類</th><th>ステージ</th><th>BCS／胸囲</th><th>RF</th><th>注意</th></tr></thead><tbody>
+  ${vRows.map((r,i)=>{const a=r.kind==='bcs'?autoStage(r.cow,view.date):null;return `<tr><td><input type="checkbox" data-vi="${i}" checked style="width:22px;height:22px"></td><td><input type="text" value="${r.cow}" data-vf="cow" data-vi="${i}" style="width:80px"></td><td>${KINDS[r.kind].label}</td>
+  <td style="text-align:left;white-space:normal">${r.kind!=='bcs'?'':a&&a.stage?STAGES[a.stage].label+'<br><span class="muted">'+esc(a.why)+'</span>':'<span class="muted">下で選ぶ'+(a?'（'+esc(a.why)+'）':'')+'</span>'}</td>
+  <td><input type="number" step="0.25" value="${r.kind==='chest'?r.chest:(r.bcs??'')}" data-vf="${r.kind==='chest'?'chest':'bcs'}" data-vi="${i}" style="width:90px"></td>
+  <td>${r.kind==='bcs'?`<input type="number" min="1" max="5" step="1" value="${r.rf??''}" data-vf="rf" data-vi="${i}" style="width:64px">`:''}</td>
+  <td class="${r.warn.length?'flag':''}" style="white-space:normal">${esc(r.warn.join('、'))}</td></tr>`}).join('')}</tbody></table></div>
+  <p class="muted">聞き取りの間違い（4桁・数字）はここで直せます。取り込んだ分は「音声・未確認」の印が付き、あとで押して確認済みにします。</p>
+  <label>BCSのステージ（個体情報で決まらない牛に付ける。混ざっているときは「不明」で取り込み、あとで分ける）</label><select id="vStage" style="width:auto;margin-bottom:8px">${Object.entries(STAGES).map(([k,v])=>`<option value="${k}" ${(view.stage||'none')===k?'selected':''}>${v.label}</option>`).join('')}</select><br>
+  <button class="btn primary" id="importBtn">チェックした行を ${md(view.date)} に取り込む</button></div>`;
+  box.querySelectorAll('[data-vf]').forEach(el=>el.onchange=()=>{const r=vRows[+el.dataset.vi];const f=el.dataset.vf;r[f]=f==='cow'?el.value.trim():(el.value===''?null:+el.value)});
+  document.getElementById('importBtn').onclick=()=>{
+    let n=0;
+    box.querySelectorAll('[data-vi][type=checkbox]').forEach(cb=>{ if(!cb.checked) return; const r=vRows[+cb.dataset.vi];
+      if(!/^\d{4}$/.test(r.cow)) return;
+      const row={id:uid(),date:view.date,kind:r.kind,cow:r.cow,src:'音声',conf:false,ts:Date.now()+n,note:'音声 '+r.raw};
+      if(r.kind==='bcs'){ if(r.bcs==null) return; row.bcs=r.bcs; row.rf=r.rf; Object.assign(row,stageFor(autoStage(r.cow,view.date),document.getElementById('vStage').value)); } else { if(r.chest==null) return; row.chest=r.chest; row.wt=estWeight(r.chest); }
+      S.rows.push(row); n++; });
+    save(); vRows=[]; view.tab='res'; render(); alert(n+'件を取り込みました');
+  };
+}
+
+/* ---------- グラフ部品 ---------- */
+function lineChart(series,opt={}){
+  const W=opt.w||640,H=opt.h||220,P={l:40,r:12,t:12,b:30};
+  const xs=opt.xs; const all=series.flatMap(s=>s.pts.map(p=>p.y)).filter(y=>y!=null);
+  if(!all.length) return '<p class="muted">データなし</p>';
+  let lo=opt.min!=null?opt.min:Math.min(...all), hi=opt.max!=null?opt.max:Math.max(...all);
+  (opt.bands||[]).forEach(b=>{lo=Math.min(lo,b[0]);hi=Math.max(hi,b[1])}); if(lo===hi){lo-=1;hi+=1}
+  const pad=(hi-lo)*0.08; lo-=pad;hi+=pad;
+  const X=i=>P.l+(xs.length===1?(W-P.l-P.r)/2:i*(W-P.l-P.r)/(xs.length-1)); const Y=y=>P.t+(hi-y)/(hi-lo)*(H-P.t-P.b);
+  let g=''; (opt.bands||[]).forEach(b=>{g+=`<rect x="${P.l}" y="${Y(b[1])}" width="${W-P.l-P.r}" height="${Math.max(0,Y(b[0])-Y(b[1]))}" fill="var(--band)"/>`});
+  for(let i=0;i<=4;i++){const y=lo+(hi-lo)*i/4;g+=`<line x1="${P.l}" x2="${W-P.r}" y1="${Y(y)}" y2="${Y(y)}" stroke="var(--line)"/><text x="${P.l-6}" y="${Y(y)+4}" text-anchor="end">${(+y).toFixed(opt.dec??1)}</text>`}
+  const step=Math.ceil(xs.length/8); xs.forEach((x,i)=>{if(i%step===0||i===xs.length-1) g+=`<text x="${X(i)}" y="${H-8}" text-anchor="middle">${md(x)}</text>`});
+  series.forEach(s=>{
+    const pts=s.pts.map((p,i)=>p.y==null?null:[X(i),Y(p.y)]); const seg=pts.filter(Boolean);
+    if(seg.length>1) g+=`<polyline fill="none" stroke="${s.color}" stroke-width="2.5" points="${seg.map(p=>p.join(',')).join(' ')}"/>`;
+    seg.forEach(p=>{g+=`<circle cx="${p[0]}" cy="${p[1]}" r="4" fill="${s.color}"/>`});
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${esc(opt.label||'推移')}">${g}</svg>
+  <div class="legend">${series.map(s=>`<span><i style="background:${s.color}"></i>${esc(s.name)}</span>`).join('')}${(opt.bands||[]).length?'<span><i style="background:var(--band)"></i>目安</span>':''}</div>`;
+}
+function stackBar(label,v,parts,colors,T){
+  const tot=parts.reduce((a,p)=>a+(v[p.k]||0),0)||1;
+  return `<div style="margin:6px 0"><div class="muted">${esc(label)}</div><div style="display:flex;height:30px;border-radius:8px;overflow:hidden">${parts.map((p,i)=>`<div style="width:${(v[p.k]||0)/tot*100}%;background:${colors[i]};color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center">${v[p.k]!=null&&v[p.k]>=6?f1(v[p.k],0):''}</div>`).join('')}</div></div>`;
+}
+
+/* ---------- 結果（その場で見る） ---------- */
+function bcsHist(rows,prevRows){
+  const bins=[];for(let x=2;x<=4.5001;x+=0.25)bins.push(x);
+  const cnt=(rs,b)=>rs.filter(r=>Math.abs(r.bcs-b)<0.126&&r.bcs!=null).length;
+  const c=bins.map(b=>cnt(rows,b)), p=prevRows?bins.map(b=>cnt(prevRows,b)):null; const mx=Math.max(1,...c,...(p||[0]));
+  const W=640,H=180,bw=(W-50)/bins.length; const band=S.targets.bcs;
+  let g=`<rect x="${40+bins.findIndex(b=>b>=band[0])*bw}" y="8" width="${Math.max(0,(bins.filter(b=>b>=band[0]&&b<=band[1]).length)*bw)}" height="${H-38}" fill="var(--band)"/>`;
+  bins.forEach((b,i)=>{const x=40+i*bw;const h=c[i]/mx*(H-48);g+=`<rect x="${x+3}" y="${H-30-h}" width="${bw-6}" height="${h}" fill="var(--c1)" rx="3"/>`;
+    if(p){const ph=p[i]/mx*(H-48);g+=`<rect x="${x+3}" y="${H-30-ph}" width="${bw-6}" height="${ph}" fill="none" stroke="var(--prev)" stroke-width="2" stroke-dasharray="3 2" rx="3"/>`}
+    if(c[i])g+=`<text x="${x+bw/2}" y="${H-34-h}" text-anchor="middle" style="fill:var(--ink)">${c[i]}</text>`;
+    g+=`<text x="${x+bw/2}" y="${H-12}" text-anchor="middle">${b.toFixed(2)}</text>`});
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="BCSの分布">${g}</svg><div class="legend"><span><i style="background:var(--c1)"></i>今回</span>${p?'<span><i style="border:2px dashed var(--prev);background:none"></i>前回</span>':''}<span><i style="background:var(--band)"></i>全体の帯 ${band[0]}〜${band[1]}（判定はステージ別）</span></div>`;
+}
+/* 育成の成長：成牛比・月齢・増体の判定 */
+function judgeGrowth(r,adg){
+  const T=S.targets; const pct=r.wt/T.mbw*100; const ro=S.roster[r.cow]; let mo=null; const msgs=[];
+  if(ro&&ro.birth){ mo=(new Date(r.date)-new Date(ro.birth))/864e5/30.44; if(mo<0||mo>40) mo=null; }
+  const adgBad=adg!=null&&(adg<T.adg[0]||adg>T.adg[1]);
+  if(adgBad) msgs.push(adg<T.adg[0]?'増体が遅い':'増体が速すぎ');
+  if(mo!=null&&mo>=13&&mo<=15&&pct<55) msgs.push('授精の目安55%未満');
+  return {pct,mo,adgBad,msgs};
+}
+/* ステージごとの集計：頭数・BCS平均・目安内の割合・注意の頭数・RF平均 */
+function stageTable(b){
+  const groups={}; b.forEach(r=>{(groups[r.stage||'none']=groups[r.stage||'none']||[]).push(r)});
+  const keys=Object.keys(STAGES).filter(k=>groups[k]); if(keys.length===1&&keys[0]==='none') return '<p class="muted">ステージを付けると、ステージ別の目安で判定します（入力画面・音声取り込みで選ぶ）。</p>';
+  return `<div class="scroll"><table style="margin:8px 0"><thead><tr><th>ステージ</th><th>頭数</th><th>BCS平均</th><th>帯の中</th><th>注意</th><th>RF平均</th></tr></thead><tbody>${keys.map(k=>{const g=groups[k],st=STAGES[k]; const has=st.dry||st.dim;
+    const inb=has?g.filter(r=>{const b=bcsBand(r.stage,r.dim);return r.bcs>=b[0]-1e-9&&r.bcs<=b[1]+1e-9}).length:null; const warn=g.filter(r=>judgeBcs(r,lastOfCow('bcs',r.cow,r.date)).some(j=>j.lv==='warn')).length;
+    return `<tr><td style="text-align:left">${st.label}${has?'<br><span class="muted" style="font-size:11px">'+stageBandTxt(k)+'</span>':''}</td><td>${g.length}</td><td>${f1(mean(g.map(r=>r.bcs)),2)}</td><td>${inb==null?'–':Math.round(inb/g.length*100)+'%'}</td><td class="${warn?'flag':''}">${has?warn+'頭':'–'}</td><td>${f1(mean(g.filter(r=>r.rf!=null).map(r=>r.rf)),2)}</td></tr>`}).join('')}</tbody></table></div>
+  <p class="muted">帯は Oikawa/Fetrow の図（月次レポートと同じ）。泌乳中は1頭ずつ分娩後日数での帯で判定（分娩後日数が分からない牛はステージの真ん中の日数）。</p>`;
+}
+function resultsBlocks(date){
+  let out='';
+  const b=rowsOf('bcs',date);
+  if(b.length){
+    const pd=prevDate('bcs',date), pr=pd?rowsOf('bcs',pd):null; const bs=b.map(r=>r.bcs), rfs=b.filter(r=>r.rf!=null).map(r=>r.rf);
+    const withPrev=b.map(r=>{const p=lastOfCow('bcs',r.cow,date);return {r,p,d:p?r.bcs-p.bcs:null}});
+    const jumps=withPrev.filter(x=>x.d!=null&&Math.abs(x.d)>=S.targets.bcsJump);
+    const out_=b.filter(outOfBand);
+    out+=`<div class="card"><h2>🐄 BCS・ルーメンフィル　${md(date)}</h2><div class="kpis">
+      <div class="kpi">測定<b>${b.length}頭</b></div><div class="kpi">BCS平均<b>${f1(mean(bs),2)}</b>${pr?`<span class="muted">前回 ${f1(mean(pr.map(x=>x.bcs)),2)}（${md(pd)}）</span>`:''}</div>
+      <div class="kpi">RF平均<b>${f1(mean(rfs),2)}</b><span class="muted">${rfs.length}頭</span></div>
+      <div class="kpi">目安の外<b class="${out_.length?'flag':''}">${out_.length}頭</b></div></div>
+      ${bcsHist(b,pr)}
+      ${jumps.length?`<div class="warnbox">⚠ 前回から ${S.targets.bcsJump} 以上動いた牛：${jumps.map(x=>`${x.r.cow}（${f1(x.p.bcs,2)}→${f1(x.r.bcs,2)}）`).join('、')}</div>`:''}
+      ${stageTable(b)}
+      <div class="scroll"><table><thead><tr><th>4桁</th><th>ステージ</th><th>BCS</th><th>前回</th><th>差</th><th>RF</th><th>判定</th></tr></thead><tbody>
+      ${withPrev.sort((a,b)=>(a.r.stage||'').localeCompare(b.r.stage||'')||a.r.cow.localeCompare(b.r.cow)).map(({r,p,d})=>`<tr><td>${esc(r.cow)}${r.src==='音声'&&!r.conf?'<span class="tag">音声</span>':''}</td><td style="text-align:left">${STAGES[r.stage||'none'].label}${r.dim!=null?'<span class="muted"> '+r.dim+'日</span>':''}</td><td><b>${f1(r.bcs,2)}</b></td><td>${p?f1(p.bcs,2):'–'}</td><td class="${d!=null&&Math.abs(d)>=S.targets.bcsJump?'flag':''}">${d==null?'–':(d>0?'+':'')+f1(d,2)}</td><td>${r.rf??'–'}</td><td style="text-align:left;white-space:normal">${judgeHtml(judgeBcs(r,p),r.stage)}</td></tr>`).join('')}</tbody></table></div></div>`;
+  }
+  const ch=rowsOf('chest',date);
+  if(ch.length){
+    const rows=ch.map(r=>{const p=lastOfCow('chest',r.cow,date);const days=p?(new Date(date)-new Date(p.date))/864e5:null;return{r,p,g:p?r.wt-p.wt:null,adg:p&&days>0?(r.wt-p.wt)/days:null}});
+    out+=`<div class="card"><h2>📏 胸囲→体重　${md(date)}</h2><div class="kpis"><div class="kpi">測定<b>${ch.length}頭</b></div><div class="kpi">推定体重 平均<b>${f1(mean(ch.map(r=>r.wt)),0)}kg</b></div><div class="kpi">増体 平均<b>${f1(mean(rows.filter(x=>x.adg!=null).map(x=>x.adg)),2)}kg/日</b></div></div>
+    <div class="scroll"><table><thead><tr><th>4桁</th><th>月齢</th><th>胸囲</th><th>推定kg</th><th>成牛比</th><th>前回kg</th><th>増体kg/日</th><th>判定</th></tr></thead><tbody>${rows.map(({r,p,adg})=>{const gj=judgeGrowth(r,adg);
+      return `<tr><td>${esc(r.cow)}</td><td>${gj.mo==null?'–':f1(gj.mo,1)}</td><td>${f1(r.chest,0)}</td><td><b>${f1(r.wt,0)}</b></td><td>${f1(gj.pct,0)}%</td><td>${p?f1(p.wt,0):'–'}</td><td class="${gj.adgBad?'flag':''}">${f1(adg,2)}</td><td style="text-align:left;white-space:normal">${gj.msgs.length?gj.msgs.map(m=>`<span class="flag">⚠ ${m}</span>`).join(' '):(adg!=null||gj.mo!=null?'<span class="okc">✓</span>':'')}</td></tr>`}).join('')}</tbody></table></div>
+    <p class="muted">推定体重＝0.0234×胸囲²−2.281×胸囲+75.618（ホルスタイン育成牛用、当院の体高・体重の表の式）。成牛比＝推定体重÷成牛体重 ${S.targets.mbw}kg。目安：授精時 55%・分娩後 85%（NASEM 2021 などの成長目標）、増体 ${S.targets.adg[0]}〜${S.targets.adg[1]}kg/日。月齢は個体情報（生年月日）があるときだけ。</p></div>`;
+  }
+  for(const k of ['feces','psps']){
+    const rs=rowsOf(k,date); if(!rs.length) continue;
+    const parts=k==='feces'?[['top','上段'],['mid','中段'],['bot','下段']]:[['top','上段'],['mid','中段'],['low','下段'],['tray','受け皿']];
+    const colors=['#b45309','#d97706','#65a30d','#0e7490'];
+    out+=`<div class="card"><h2>${KINDS[k].icon} ${KINDS[k].label}　${md(date)}</h2>`+rs.map(r=>{
+      const p=lastOfSample(k,r.sample,date);
+      return `<div style="margin:10px 0">${stackBar(r.sample||'（名前なし）',r.v,parts.map(x=>({k:x[0]})),colors)}
+       ${p?stackBar('前回 '+md(p.date),p.v,parts.map(x=>({k:x[0]})),colors):''}
+       <div class="muted">${parts.map(x=>`${x[1]} ${f1(r.v[x[0]])}${p?`（${r.v[x[0]]-p.v[x[0]]>=0?'+':''}${f1(r.v[x[0]]-p.v[x[0]])}）`:''}`).join('　')}</div><div>${sieveFlags(k,r.v)}</div></div>`}).join('')+
+      `<div class="legend">${parts.map((x,i)=>`<span><i style="background:${colors[i]}"></i>${x[1]}</span>`).join('')}</div></div>`;
+  }
+  return out||'<div class="card muted">この日の記録はまだありません</div>';
+}
+function vRes(){
+  const ds=allDates(); const sel=ds.includes(view.date)?view.date:(ds[ds.length-1]||view.date);
+  return `<div class="card noprint"><div class="row"><label style="margin:0">日付</label><select id="resDate" style="width:auto">${[...new Set([...ds,view.date])].sort().reverse().map(d=>`<option value="${d}" ${d===sel?'selected':''}>${d}</option>`).join('')}</select></div></div>`+resultsBlocks(sel)+
+   (view.readonly?'':`<div class="card noprint"><button class="btn primary" data-go="share">この結果を農家さんに送る →</button></div>`);
+}
+document.getElementById('main').addEventListener('change',e=>{
+  if(e.target.dataset&&e.target.dataset.setstage){const r=S.rows.find(x=>x.id===e.target.dataset.setstage);if(r){r.stage=e.target.value;r.dim=null;r.stageSrc='選択';save();render()}return}
+  if(e.target.id==='resDate'){view.date=e.target.value;document.getElementById('date').value=view.date;render()}
+  if(e.target.id==='cmpCow'||e.target.id==='cmpSample'){view.cmpCow=document.getElementById('cmpCow')?.value;view.cmpSample=document.getElementById('cmpSample')?.value;render()}
+});
+
+/* ---------- 過去との比較 ---------- */
+function vCmp(){
+  let out='';
+  const bd=datesOf('bcs');
+  if(bd.length){
+    const mk=(f)=>bd.map(d=>({y:mean(rowsOf('bcs',d).filter(r=>r[f]!=null).map(r=>r[f]))}));
+    out+=`<div class="card"><h2>🐄 BCS・RF の平均の推移（${bd.length}回）</h2>${lineChart([{name:'BCS平均',color:'var(--c1)',pts:mk('bcs')}],{xs:bd,bands:[S.targets.bcs],dec:2,label:'BCS平均の推移'})}
+    ${lineChart([{name:'RF平均',color:'var(--c2)',pts:mk('rf')}],{xs:bd,min:1,max:5,dec:1,label:'RF平均の推移',h:170})}
+    <div class="scroll"><table><thead><tr><th>日付</th><th>頭数</th><th>BCS平均</th><th>BCS最小</th><th>BCS最大</th><th>RF平均</th></tr></thead><tbody>${bd.slice().reverse().map(d=>{const r=rowsOf('bcs',d);const b=r.map(x=>x.bcs);return `<tr><td>${d}</td><td>${r.length}</td><td>${f1(mean(b),2)}</td><td>${f1(Math.min(...b),2)}</td><td>${f1(Math.max(...b),2)}</td><td>${f1(mean(r.filter(x=>x.rf!=null).map(x=>x.rf)),2)}</td></tr>`}).join('')}</tbody></table></div></div>`;
+  }
+  // 1頭の推移
+  const cows=[...new Set(S.rows.filter(r=>(r.kind==='bcs'||r.kind==='chest')&&!r.del).map(r=>r.cow))].sort();
+  if(cows.length){
+    const c=view.cmpCow&&cows.includes(view.cmpCow)?view.cmpCow:cows[0];
+    const cb=S.rows.filter(r=>r.kind==='bcs'&&r.cow===c&&!r.del).sort((a,b)=>a.date.localeCompare(b.date)), cc=S.rows.filter(r=>r.kind==='chest'&&r.cow===c&&!r.del).sort((a,b)=>a.date.localeCompare(b.date));
+    out+=`<div class="card"><h2>1頭の推移</h2><select id="cmpCow" style="width:auto">${cows.map(x=>`<option ${x===c?'selected':''}>${x}</option>`).join('')}</select>
+    ${cb.length?lineChart([{name:'BCS',color:'var(--c1)',pts:cb.map(r=>({y:r.bcs}))},{name:'RF',color:'var(--c2)',pts:cb.map(r=>({y:r.rf}))}],{xs:cb.map(r=>r.date),min:1,max:5,dec:1,label:c+'のBCS・RF',h:180}):''}
+    ${cc.length?lineChart([{name:'推定体重kg',color:'var(--c3)',pts:cc.map(r=>({y:r.wt}))}],{xs:cc.map(r=>r.date),dec:0,label:c+'の体重',h:180}):''}</div>`;
+  }
+  for(const k of ['feces','psps']){
+    const smps=[...new Set(S.rows.filter(r=>r.kind===k&&!r.del).map(r=>r.sample||''))]; if(!smps.length) continue;
+    const key='cmp_'+k; const sm=view[key]&&smps.includes(view[key])?view[key]:smps[smps.length-1];
+    const rs=S.rows.filter(r=>r.kind===k&&!r.del&&(r.sample||'')===sm).sort((a,b)=>a.date.localeCompare(b.date));
+    const parts=k==='feces'?[['top','上段'],['mid','中段'],['bot','下段']]:[['top','上段'],['mid','中段'],['low','下段'],['tray','受け皿']];
+    const cols=['var(--c3)','var(--c2)','var(--c1)','var(--c4)'];
+    out+=`<div class="card"><h2>${KINDS[k].icon} ${KINDS[k].label}の推移</h2><select data-cmpk="${k}" style="width:auto;max-width:100%">${smps.map(x=>`<option ${x===sm?'selected':''} value="${esc(x)}">${esc(x||'（名前なし）')}</option>`).join('')}</select>
+     ${lineChart(parts.map((p,i)=>({name:p[1],color:cols[i],pts:rs.map(r=>({y:r.v[p[0]]}))})),{xs:rs.map(r=>r.date),min:0,max:100,dec:0,label:KINDS[k].label+'の推移'})}
+     <div class="scroll"><table><thead><tr><th>日付</th>${parts.map(p=>`<th>${p[1]}</th>`).join('')}</tr></thead><tbody>${rs.slice().reverse().map(r=>`<tr><td>${r.date}</td>${parts.map(p=>`<td>${f1(r.v[p[0]])}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div>`;
+  }
+  return out||'<div class="card muted">まだ記録がありません。入力すると、ここに推移が出ます。</div>';
+}
+document.getElementById('main').addEventListener('change',e=>{
+  const k=e.target.dataset&&e.target.dataset.cmpk; if(k){view['cmp_'+k]=e.target.value;render()}
+});
+
+/* ---------- 共有・設定 ---------- */
+function summaryText(date){
+  const L=[`【${S.farmName||'農家'} 現場モニタリング ${date}】`];
+  const b=rowsOf('bcs',date);
+  if(b.length){const pd=prevDate('bcs',date),pr=pd?rowsOf('bcs',pd):null;
+    L.push(`■BCS・ルーメンフィル（${b.length}頭）`,`BCS平均 ${f1(mean(b.map(r=>r.bcs)),2)}${pr?`（前回 ${md(pd)} ${f1(mean(pr.map(r=>r.bcs)),2)}）`:''}　RF平均 ${f1(mean(b.filter(r=>r.rf!=null).map(r=>r.rf)),2)}`);
+    const groups={}; b.forEach(r=>{(groups[r.stage||'none']=groups[r.stage||'none']||[]).push(r)});
+    for(const k of Object.keys(STAGES)){ const g=groups[k]; if(!g||k==='none') continue; const st=STAGES[k];
+      const w=g.map(r=>({r,j:judgeBcs(r,lastOfCow('bcs',r.cow,date)).filter(x=>x.lv==='warn')})).filter(x=>x.j.length);
+      L.push(`・${st.label} ${g.length}頭：BCS平均 ${f1(mean(g.map(r=>r.bcs)),2)}（帯 ${stageBandTxt(k)}）、注意 ${w.length}頭`+(w.length?'\n　'+w.map(x=>`${x.r.cow}（${x.j.map(j=>j.t).join('・')}）`).join('、'):'')); }
+    const un=groups.none||[]; const lo=un.filter(r=>r.bcs<S.targets.bcs[0]),hi=un.filter(r=>r.bcs>S.targets.bcs[1]);
+    if(lo.length)L.push('BCS低め：'+lo.map(r=>`${r.cow}(${f1(r.bcs,2)})`).join('、')); if(hi.length)L.push('BCS高め：'+hi.map(r=>`${r.cow}(${f1(r.bcs,2)})`).join('、'));
+    const j=b.map(r=>({r,p:lastOfCow('bcs',r.cow,date)})).filter(x=>x.p&&Math.abs(x.r.bcs-x.p.bcs)>=S.targets.bcsJump); if(j.length)L.push('前回から大きく変化：'+j.map(x=>`${x.r.cow}(${f1(x.p.bcs,2)}→${f1(x.r.bcs,2)})`).join('、'));}
+  const ch=rowsOf('chest',date);
+  if(ch.length){L.push(`■胸囲→体重（${ch.length}頭）推定体重 平均 ${f1(mean(ch.map(r=>r.wt)),0)}kg`);
+    const g=ch.map(r=>{const p=lastOfCow('chest',r.cow,date);const d=p?(new Date(date)-new Date(p.date))/864e5:0;return p&&d>0?(r.wt-p.wt)/d:null}).filter(x=>x!=null); if(g.length)L.push(`増体 平均 ${f1(mean(g),2)}kg/日（前回比）`);}
+  for(const k of ['feces','psps']){ const rs=rowsOf(k,date); if(!rs.length) continue; L.push(`■${KINDS[k].label}`);
+    const parts=k==='feces'?[['top','上'],['mid','中'],['bot','下']]:[['top','上'],['mid','中'],['low','下'],['tray','皿']];
+    rs.forEach(r=>{const p=lastOfSample(k,r.sample,date);const fl=[];const T=S.targets[k];for(const kk in T){const v=r.v[kk];if(v!=null&&(v<T[kk][0]||v>T[kk][1]))fl.push(parts.find(x=>x[0]===kk)[1]+(v<T[kk][0]?'低':'高'));}
+      L.push(`${r.sample||'（名前なし）'}：${parts.map(x=>x[1]+f1(r.v[x[0]])).join(' ')}${p?`（前回 ${md(p.date)} ${parts.map(x=>f1(p.v[x[0]])).join('/')}）`:''}${fl.length?' ⚠'+fl.join('・'):' 目安内'}`)});}
+  L.push('※BCSの帯は Oikawa/Fetrow の図、ほかの目安は文献の値。測定値の判断は獣医師。');
+  return L.join('\n');
+}
+function vShare(){
+  const ds=allDates(); const d=ds.includes(view.date)?view.date:(ds[ds.length-1]||view.date);
+  view.shareText=summaryText(d); const unconf=S.rows.filter(r=>!r.del&&r.src==='音声'&&!r.conf).length;
+  return `<div class="card"><h2>農家さんに送る</h2>
+   <div class="row"><label style="margin:0">日付</label><select id="shDate" style="width:auto">${[...new Set([...ds,view.date])].sort().reverse().map(x=>`<option ${x===d?'selected':''}>${x}</option>`).join('')}</select></div>
+   ${unconf?`<div class="warnbox">⚠ 音声の未確認が ${unconf} 件あります。送る前に「入力」の一覧で確認してください。</div>`:''}
+   <pre class="out" id="sumOut">${esc(view.shareText)}</pre>
+   <div class="row"><button class="btn primary" id="copyBtn">📋 コピー（LINE等に貼る）</button><button class="btn" id="nativeShare">📤 共有</button><button class="btn" id="linkBtn">🔗 閲覧リンク</button><button class="btn" onclick="window.print()">🖨 印刷／PDF</button></div>
+   <div id="shmsg" class="muted" role="status"></div>
+   <p class="muted">閲覧リンクは、この日と前回の記録を<b>リンクの中</b>に入れます（サーバーには置きません）。リンクを知っている人は見られるので、送り先は農家さん本人だけに。</p></div>
+  <div class="card"><h2>設定</h2><div class="grid g2"><div><label>農家名</label><input type="text" id="farmName" value="${esc(S.farmName)}"></div><div><label>農家ID（保存先）</label><input type="text" value="${esc(FARM_ID)}" disabled></div></div>
+   <p class="muted">農家ごとに開くアドレスの末尾を <code>?farm=shirakawa</code> のようにすると、保存先が分かれて混ざりません。</p>
+   <h2 style="margin-top:12px">目安（仮置き・直せる）</h2>
+   <div class="grid g2"><div><label>全体の帯 下（ステージ不明の牛）</label><input type="number" step="0.25" id="tBcsLo" value="${S.targets.bcs[0]}"></div><div><label>全体の帯 上</label><input type="number" step="0.25" id="tBcsHi" value="${S.targets.bcs[1]}"></div>
+   <div><label>BCSが動いた印（±）</label><input type="number" step="0.25" id="tJump" value="${S.targets.bcsJump}"></div>
+   <div><label>成牛体重 kg（経産牛の平均に直す）</label><input type="number" step="10" id="tMbw" value="${S.targets.mbw}"></div>
+   <div><label>増体 下限 kg/日</label><input type="number" step="0.05" id="tAdgLo" value="${S.targets.adg[0]}"></div>
+   <div><label>増体 上限 kg/日（要確認）</label><input type="number" step="0.05" id="tAdgHi" value="${S.targets.adg[1]}"></div></div>
+   <p class="muted">糞洗い・PSPSの目安は 設定ファイル（targets）で変更。初期値＝糞洗い NWF（上&lt;10・中&lt;20・下&gt;50）／PSPS 19・8・1.18mm（上2〜8・中30〜50・下30〜50・皿&lt;20）。要確認の出典あり。</p>
+   <button class="btn" id="saveSet">設定を保存</button></div>
+  ${rosterCard()}
+  ${indicatorCard()}
+  <div class="card"><h2>データの保存・取り込み</h2><p class="muted">データはこの端末のブラウザの中だけにあります。端末を替える・ブラウザのデータを消す前に、必ずバックアップを。</p>
+   <div class="row"><button class="btn" id="expJson">💾 バックアップ（JSON）</button><button class="btn" id="expCsv">📄 CSV（4種）</button>
+   <label class="btn" style="margin:0">⬆ 読み込む（JSON）<input type="file" id="impJson" accept=".json" class="hide"></label></div>
+   <p class="muted">読み込みは「足す」動作です（同じ記録は重複しません）。過去のデータは、PC で作ったバックアップ（JSON）を読み込みます。個体情報（4桁→10桁・生年月日）も同じJSONで入ります。</p></div>`;
+}
+function rosterCard(){
+  const n=Object.keys(S.roster||{}).length, I=S.rosterInfo;
+  const vals=Object.values(S.roster||{}); const nf=vals.filter(r=>r.fresh).length, nd=vals.filter(r=>r.due).length;
+  return `<div class="card"><h2>個体情報（TAF・ファームノート）</h2>
+  <p>${n? `いま <b>${n}頭</b>（分娩日あり ${nf}頭・分娩予定日あり ${nd}頭）${I?`<br><span class="muted">${esc(I.src)}「${esc(I.file)}」を ${I.date} に読み込み${I.fileDate?'（ファイルの日付 '+I.fileDate+'）':''}</span>`:''}` : '<span class="muted">まだありません</span>'}</p>
+  <label class="btn primary" style="margin:0">⬆ 牛の一覧の CSV を読む<input type="file" id="impRoster" accept=".csv,.txt,text/csv" class="hide"></label>
+  ${n?'<button class="btn" id="restage">記録のステージを個体情報で付け直す</button>':''}
+  <div id="rmsg" class="muted" role="status"></div>
+  <ul class="muted" style="padding-left:18px">
+   <li><b>TAF</b>：酪畜履歴 → 牛一覧 → 「表示中リストCSV出力」（在籍牛一覧。耳標ID・最新分娩日・分娩予定日が入る）。CSV出力の「在籍」も読めるが、分娩日が無いのでステージは自動で付かない（月齢は出る）。</li>
+   <li><b>ファームノート</b>：牛の一覧を CSV で書き出す（個体識別番号・耳標番号・出生日・最終分娩日・分娩予定日・一般ステータスの列を入れる）。</li>
+   <li>入れると：4桁から10桁が分かり（CSV に10桁で出る）、BCSのステージ（乾乳前期・後期／フレッシュ／最盛期／中後期）と分娩後日数が自動で付き、胸囲の月齢が出る。</li>
+   <li>読み込むたびに、同じ4桁は新しい一覧で上書き。居なくなった牛（売却・死亡など）は入れない。<b>4桁が重なる牛は入れない</b>（どちらの牛か決められないため）。</li>
+   <li>ステージは一覧の日の情報で決まる。その後に分娩した牛は古いままなので、測る前に新しい一覧を読む。</li>
+   <li>個体情報はこの端末の中だけ。共有リンクには入らない。</li></ul></div>`;
+}
+function indicatorCard(){
+  const T=S.targets;
+  return `<div class="card"><h2>指標と出典（農家さんへの説明用）</h2>
+  <div class="scroll"><table><thead><tr><th>ステージ</th><th>区切り</th><th>BCSの帯</th><th>RF</th><th>BCSの変化</th></tr></thead><tbody>
+  ${Object.entries(STAGES).filter(([k])=>k!=='none').map(([k,s])=>`<tr><td>${s.label}</td><td style="white-space:normal">${s.range}</td><td style="white-space:normal">${stageBandTxt(k)}</td><td>${s.rf}以上</td><td>${s.loss===0?'低下で注意':s.loss?s.loss+'超の低下で注意':'–'}</td></tr>`).join('')}</tbody></table></div>
+  <ul class="muted" style="padding-left:18px"><li><b>BCSの帯</b>：Plot of Body Condition Scores by Days in Milk（S. Oikawa・原表 J. Fetrow）。乾乳 3.25〜3.75、泌乳中は 分娩0日 3.25〜3.75 → 50日 2.75〜3.25 → 300日 3.25〜3.75 の線。帯の外は注意。月次レポートと同じ帯。参考：文献（Roche 2009）では分娩時 3.0〜3.25 が最適で、3.5以上は分娩後の採食・乳量の低下と代謝病が増えるとされる。</li>
+  ${Object.entries(STAGES).filter(([k])=>k!=='none').map(([k,s])=>`<li><b>${s.label}</b>：${esc(s.note)}</li>`).join('')}
+  <li><b>胸囲→体重</b>：成牛比 授精時55%・分娩後85%、増体 ${T.adg[0]}〜${T.adg[1]}kg/日（大型品種で約0.8）。胸囲からの推定は Heinrichs 1992 の考え方（2017 に再検証）、式は当院の体高・体重の表。</li>
+  <li><b>PSPS（19・8・1.18mm、TMR）</b>：上 ${T.psps.top.join('〜')}%・中 ${T.psps.mid.join('〜')}%・下 ${T.psps.low.join('〜')}%・受け皿 ${T.psps.tray[1]}%未満（Penn State DAS 02-42、Kononoff 2003）。北米の泌乳牛TMRの値。</li>
+  <li><b>糞洗い</b>：上 ${T.feces.top[1]}%未満・中 ${T.feces.mid[1]}%未満・下 ${T.feces.bot[0]}%超（英NWFの実務の目安）。<b>査読論文の基準値は見つからない</b>。採材の時刻で大きく変わる（Kljak 2019）ので、同じ時刻・同じ群で自分の牧場の推移を見る。</li>
+  <li>RFの目安は月次レポートと同じ一般的な目安（CRV の飼養ガイド・Zaaijer & Noordhuizen 2003 を引いた二次資料。原著は未読・要確認）。泌乳中のRFは採食量の指標として弱い（Götze 2019）。</li></ul>
+  <p class="muted">どれも文献の目安で、この牧場で決めた値ではありません。判断は獣医師。</p></div>`;
+}
+async function packShare(date){
+  const keep=new Set([date]); for(const k of Object.keys(KINDS)){const p=prevDate(k,date); if(p) keep.add(p);}
+  const rows=S.rows.filter(r=>!r.del&&keep.has(r.date)).map(r=>({d:r.date,k:r.kind,c:r.cow,b:r.bcs,r:r.rf,h:r.chest,w:r.wt,s:r.sample,v:r.v,st:r.stage,m:r.dim,u:r.src==='音声'&&!r.conf?1:undefined}));
+  const json=JSON.stringify({f:S.farmName,date,rows,t:S.targets}); const bytes=new TextEncoder().encode(json);
+  let b64; try{ const cs=new Blob([bytes]).stream().pipeThrough(new CompressionStream('deflate-raw')); const buf=new Uint8Array(await new Response(cs).arrayBuffer()); b64='z'+btoa(String.fromCharCode(...buf)); }
+  catch(_){ b64='p'+btoa(String.fromCharCode(...bytes)); }
+  return b64.replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+async function unpackShare(s){
+  const mode=s[0]; let b=s.slice(1).replace(/-/g,'+').replace(/_/g,'/'); while(b.length%4) b+='='; const bin=Uint8Array.from(atob(b),c=>c.charCodeAt(0));
+  let bytes=bin; if(mode==='z'){ const ds=new Blob([bin]).stream().pipeThrough(new DecompressionStream('deflate-raw')); bytes=new Uint8Array(await new Response(ds).arrayBuffer()); }
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+function download(name,text,type='application/json'){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+function csvOf(){
+  const q=v=>v==null?'':'"'+String(v).replace(/"/g,'""')+'"'; const live=S.rows.filter(r=>!r.del);
+  const ro=(r)=>S.roster[r.cow]&&S.roster[r.cow].id10||r.cow;
+  return {
+   'cow_score.csv':'cow_id,date,bcs,rumen_fill,stage,note,source,dim,stage_from\n'+live.filter(r=>r.kind==='bcs').map(r=>[ro(r),r.date,r.bcs,r.rf,STAGES[r.stage||'none'].label,r.note||'',r.src+(r.conf?'':'・未確認'),r.dim,r.stageSrc||''].map(q).join(',')).join('\n'),
+   'weight.csv':'cow_id,date,chest_cm,weight_est,source\n'+live.filter(r=>r.kind==='chest').map(r=>[ro(r),r.date,r.chest,r.wt==null?'':r.wt.toFixed(1),r.src].map(q).join(',')).join('\n'),
+   'feces.csv':'date,target,top_pct,mid_pct,bot_pct,top_g,mid_g,bot_g\n'+live.filter(r=>r.kind==='feces').map(r=>{const g=r.g||{};return [r.date,r.sample,r.v.top,r.v.mid,r.v.bot,g.top,g.mid,g.bot].map(q).join(',')}).join('\n'),
+   'psps.csv':'date,sample,top_pct,mid_pct,low_pct,tray_pct,top_g,mid_g,low_g,tray_g\n'+live.filter(r=>r.kind==='psps').map(r=>{const g=r.g||{};return [r.date,r.sample,r.v.top,r.v.mid,r.v.low,r.v.tray,g.top,g.mid,g.low,g.tray].map(q).join(',')}).join('\n'),
+  };
+}
+document.getElementById('main').addEventListener('click',async e=>{
+  const id=e.target.id; const msg=document.getElementById('shmsg'); const d=(document.getElementById('shDate')||{}).value||view.date;
+  if(id==='copyBtn'){try{await navigator.clipboard.writeText(view.shareText);msg.textContent='コピーしました'}catch(_){const r=document.createRange();r.selectNode(document.getElementById('sumOut'));getSelection().removeAllRanges();getSelection().addRange(r);msg.textContent='選択しました。コピーしてください'}}
+  if(id==='nativeShare'){ if(navigator.share) navigator.share({title:'現場モニタリング',text:view.shareText}).catch(()=>{}); else msg.textContent='この端末では共有メニューが使えません。コピーを使ってください'}
+  if(id==='linkBtn'){ const tok=await packShare(d); const url=location.origin==='null'||location.protocol==='file:'? location.href.split('#')[0].split('?')[0]+'#share='+tok : location.origin+location.pathname+'#share='+tok;
+    try{await navigator.clipboard.writeText(url);msg.textContent='リンクをコピーしました（'+Math.round(url.length/1000)+'千字）'+(location.protocol==='file:'?'　※いまはファイルを直接開いているので、アプリを置いた場所のアドレスで開き直すと相手に届くリンクになります':'')}catch(_){prompt('リンクをコピー',url)} }
+  if(id==='restage'){ let n=0,keep=0;
+    S.rows.forEach(r=>{ if(r.kind!=='bcs'||r.del) return; if(r.stageSrc==='選択'&&r.stage&&r.stage!=='none'){keep++;return}
+      if(r.stage&&r.stage!=='none'&&!r.stageSrc){keep++;return}       // 前に手で選んだもの（印なし）は残す
+      const a=autoStage(r.cow,r.date); if(a&&a.stage&&(a.stage!==r.stage||a.dim!==r.dim)){ Object.assign(r,{stage:a.stage,dim:a.dim,stageSrc:'個体情報'}); n++; } });
+    save(); render(); document.getElementById('rmsg').textContent=`${n}件に付けました（手で選んだ ${keep}件はそのまま。一覧の日より前の分娩・乾乳は分からないので、古い記録には付かないことがあります）`; return; }
+  if(id==='expJson') download((FARM_ID)+'_monitor_'+today()+'.json',JSON.stringify(S));
+  if(id==='expCsv'){const c=csvOf();Object.entries(c).forEach(([n,t],i)=>setTimeout(()=>download(FARM_ID+'_'+n,'﻿'+t,'text/csv'),i*300))}
+  if(id==='saveSet'){S.farmName=document.getElementById('farmName').value.trim();const lo=+document.getElementById('tBcsLo').value,hi=+document.getElementById('tBcsHi').value;S.targets=Object.assign({},S.targets,{bcs:[lo,hi],bcsJump:+document.getElementById('tJump').value||0.5,mbw:+document.getElementById('tMbw').value||680,adg:[+document.getElementById('tAdgLo').value||0.7,+document.getElementById('tAdgHi').value||1.0]});save();render()}
+});
+document.getElementById('main').addEventListener('change',async e=>{
+  if(e.target.id==='shDate'){view.date=e.target.value;document.getElementById('date').value=view.date;render()}
+  if(e.target.id==='impRoster'){ const f=e.target.files[0]; if(!f) return; const rm=document.getElementById('rmsg'); try{
+    const buf=await f.arrayBuffer(); let txt; try{ txt=new TextDecoder('utf-8',{fatal:true}).decode(buf); }catch(_){ txt=new TextDecoder('shift_jis').decode(buf); }   // TAF は cp932
+    const p=parseRosterCsv(txt); const R=rosterFrom(p); const nNew=Object.keys(R.roster).length;
+    if(!nNew) throw new Error('牛が1頭も読めませんでした');
+    // よその牧場の一覧を入れていないか：前の個体情報の10桁とほとんど重ならなければ確かめる
+    const old=new Set(Object.values(S.roster||{}).map(r=>r.id10).filter(Boolean));
+    if(old.size>=20){ const hit=Object.values(R.roster).filter(r=>old.has(r.id10)).length;
+      if(hit<0.3*Math.min(old.size,nNew)&&!confirm(`前の個体情報と ${hit}/${nNew} 頭しか重なりません。${S.farmName||'この農家'}の一覧で合っていますか？`)) return; }
+    R.dup.forEach(k=>delete S.roster[k]); Object.assign(S.roster,R.roster);
+    const fd=f.lastModified? new Date(f.lastModified):null;
+    S.rosterInfo={src:p.src,file:f.name,date:today(),fileDate:fd? fd.getFullYear()+'-'+String(fd.getMonth()+1).padStart(2,'0')+'-'+String(fd.getDate()).padStart(2,'0'):null,n:nNew};
+    save(); render();
+    document.getElementById('rmsg').innerHTML=`${esc(p.src)}を読みました：<b>${nNew}頭</b>`+(R.left?`／居なくなった牛 ${R.left}頭は入れない`:'')+(R.dup.length?`／<span class="flag">4桁が重なる ${R.dup.length}件は入れない（${R.dup.slice(0,10).join('、')}${R.dup.length>10?'…':''}）</span>`:'')+(p.hasFresh?'':'<br><span class="flag">この一覧には分娩日が無いので、ステージは自動では付きません</span>');
+  }catch(err){ (rm||{}).textContent='読み込めませんでした：'+err.message; } e.target.value=''; return; }
+  if(e.target.id==='impJson'){ const f=e.target.files[0]; if(!f) return; try{
+    const j=JSON.parse(await f.text()); if(!Array.isArray(j.rows)) throw new Error('rows が無い');
+    const have=new Set(S.rows.map(r=>[r.kind,r.date,r.cow||'',r.sample||'',r.bcs,r.rf,r.chest,JSON.stringify(r.v||null)].join('|'))); let n=0;
+    for(const r of j.rows){ const key=[r.kind,r.date,r.cow||'',r.sample||'',r.bcs,r.rf,r.chest,JSON.stringify(r.v||null)].join('|'); if(have.has(key)) continue; have.add(key); r.id=r.id||uid(); r.ts=r.ts||Date.now(); r.conf=r.conf!==false; S.rows.push(r); n++; }
+    Object.assign(S.roster,j.roster||{}); if(!S.farmName&&j.farmName) S.farmName=j.farmName; save(); render(); alert(n+'件を足しました（重複はとばしました）');
+  }catch(err){alert('読み込めませんでした：'+err.message)} }
+});
+
+/* ---------- 共有リンクで開いたとき（見るだけ） ---------- */
+async function boot(){
+  const m=location.hash.match(/^#share=(.+)$/);
+  if(m){
+    try{ const p=await unpackShare(m[1]);
+      S=blank(); S.farmName=p.f||''; S.targets=Object.assign({},DEFAULT_TARGETS,p.t||{});
+      S.rows=p.rows.map(r=>({id:uid(),date:r.d,kind:r.k,cow:r.c,bcs:r.b,rf:r.r,chest:r.h,wt:r.w,sample:r.s,v:r.v,stage:r.st==='early'?'peak':r.st,dim:r.m,src:r.u?'音声':'手入力',conf:!r.u,ts:0}));
+      view.readonly=true; view.tab='res'; view.date=p.date;
+      const bn=document.getElementById('banner'); bn.textContent='閲覧用（'+p.date+'）。この画面の内容は変更できません。'; bn.classList.remove('hide');
+    }catch(err){ document.getElementById('main').innerHTML='<div class="card flag">リンクを読み取れませんでした。送り直してもらってください。</div>'; return; }
+  }
+  render();
+}
+boot();
+if(typeof module!=='undefined') module.exports={parseVoice,parseRosterCsv,rosterFrom,bcsBand,autoStage};
+</script>
+</body>
+</html>
