@@ -20,6 +20,9 @@
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,"Hiragino Sans","Yu Gothic UI",sans-serif;padding-bottom:84px}
 header{position:sticky;top:0;z-index:5;background:var(--main);color:var(--main-ink);padding:10px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 header h1{font-size:17px;margin:0;flex:1;min-width:140px}
+.farmbtn{flex:1;min-width:140px;text-align:left;font:inherit;font-size:17px;font-weight:700;color:inherit;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.35);border-radius:10px;padding:6px 10px;min-height:40px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.farmlist button{display:block;width:100%;text-align:left;margin:6px 0}
+.farmlist button[aria-current=true]{border-color:var(--main);box-shadow:inset 4px 0 0 var(--main)}
 header input[type=date]{font:inherit;padding:4px 8px;border-radius:8px;border:0}
 main{max-width:860px;margin:0 auto;padding:12px 16px}
 nav.tabs{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--line);display:flex;z-index:6;padding-bottom:env(safe-area-inset-bottom)}
@@ -73,7 +76,7 @@ pre.out{white-space:pre-wrap;background:var(--bg);border-radius:10px;padding:10p
 </head>
 <body>
 <header>
-  <h1 id="title">現場モニタリング</h1>
+  <button id="farmBtn" class="farmbtn" aria-label="農家を選ぶ・登録する">🏠 <span id="title">農家を選ぶ</span> ▾</button>
   <input type="date" id="date" aria-label="記録日">
 </header>
 <div id="banner" class="banner hide"></div>
@@ -84,12 +87,41 @@ pre.out{white-space:pre-wrap;background:var(--bg);border-radius:10px;padding:10p
 "use strict";
 /* ============================================================
    現場モニタリング（糞洗い・PSPS・BCS/ルーメンフィル・胸囲→体重）
-   1農家 = 1アプリ。データは端末の中だけ（localStorage）。サーバーへは送らない。
-   ?farm=<農家ID> で農家ごとに保存先を分ける（混ざらない）。
+   1つのアプリで農家を選ぶ・登録する（上の 🏠 ボタン）。データは端末の中だけ（localStorage）。サーバーへは送らない。
+   農家ごとに保存先（genba-monitor:<農家ID>）を分けるので混ざらない。
+   ?farm=<農家ID> で開けばその農家から始まる（前に作ったホーム画面のアイコンもそのまま使える）。
    ============================================================ */
 const Q = new URLSearchParams(location.search);
-const FARM_ID = (Q.get('farm') || 'default').replace(/[^\w\-]/g,'').slice(0,40) || 'default';
-const KEY = 'genba-monitor:' + FARM_ID;
+const PFX = 'genba-monitor:', LAST = PFX+'@last';      // @last＝最後に開いた農家（農家のデータではない）
+const cleanId = v => String(v||'').replace(/[^\w\-]/g,'').slice(0,40);
+let FARM_ID = cleanId(Q.get('farm')) || null;          // null＝まだ農家を選んでいない
+let KEY = FARM_ID? PFX+FARM_ID : null;
+function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+function lsSet(k,v){ try{ localStorage.setItem(k,v); return true; }catch(e){ return false; } }
+/* この端末に入っている農家の一覧（記録の数・最後の日・個体情報の頭数） */
+function farmList(){
+  const out=[]; let n=0; try{ n=localStorage.length; }catch(e){}
+  for(let i=0;i<n;i++){ let k; try{ k=localStorage.key(i); }catch(e){ continue; }
+    if(!k||!k.startsWith(PFX)||k===LAST) continue;
+    let s=null; try{ s=JSON.parse(localStorage.getItem(k)); }catch(e){}
+    if(!s||!Array.isArray(s.rows)) continue;
+    const ds=s.rows.map(r=>r.date).filter(Boolean).sort();
+    out.push({id:k.slice(PFX.length), name:s.farmName||'', n:s.rows.length, last:ds[ds.length-1]||'', cows:Object.keys(s.roster||{}).length}); }
+  return out.sort((a,b)=>(b.last||'').localeCompare(a.last||'')||(a.name||a.id).localeCompare(b.name||b.id,'ja'));
+}
+function switchFarm(id){
+  FARM_ID=id; KEY=PFX+id; S=load(); lsSet(LAST,id);
+  try{ history.replaceState(null,'',location.pathname+'?farm='+encodeURIComponent(id)); }catch(e){}
+  view.tab='in'; view.bcs=null; view.rf=null; view.shareText=''; render(); window.scrollTo(0,0);
+}
+function addFarm(name){
+  name=String(name||'').trim(); if(!name){ alert('農家名を入れてください'); return; }
+  if(farmList().some(f=>f.name===name)&&!confirm('「'+name+'」はもう登録されています。別の農家として、もう1つ作りますか？')) return;
+  const id='f'+Date.now().toString(36);           // 名前を変えても保存先は変わらないよう、IDは名前と別に作る
+  FARM_ID=id; KEY=PFX+id; S=blank(); S.farmName=name;
+  if(!lsSet(KEY,JSON.stringify(S))){ alert('この端末に保存できません（容量・プライベートモード）'); return; }
+  switchFarm(id);
+}
 
 const KINDS = {
   bcs:   {label:'BCS・RF',  icon:'🐄'},
@@ -157,12 +189,12 @@ let view = {tab:'in', kind:'bcs', date:today(), readonly:false, bcs:null, rf:nul
 
 function blank(){return {farm:FARM_ID, farmName:'', rows:[], roster:{}, targets:DEFAULT_TARGETS, v:1}}
 function load(){
-  try{const s=JSON.parse(localStorage.getItem(KEY)||'null'); if(s&&s.rows){s.targets=Object.assign({},DEFAULT_TARGETS,s.targets||{}); s.roster=s.roster||{};
+  try{const s=KEY&&JSON.parse(localStorage.getItem(KEY)||'null'); if(s&&s.rows){s.targets=Object.assign({},DEFAULT_TARGETS,s.targets||{}); s.roster=s.roster||{};
     s.rows.forEach(r=>{ if(r.stage&&!STAGES[r.stage]) r.stage=r.stage==='early'?'peak':'none'; });   // 2026-11-22 前の区切り（泌乳前期 early）→ 最盛期
     return s;}}catch(e){}
   return blank();
 }
-function save(){ if(view.readonly) return; try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){alert('保存できません（容量・プライベートモード）。「共有・設定」からバックアップを保存してください');} }
+function save(){ if(view.readonly||!KEY) return; try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){alert('保存できません（容量・プライベートモード）。「共有・設定」からバックアップを保存してください');} }
 function today(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
 const esc = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const md = d => d? d.slice(5).replace('-','/') : '';
@@ -298,19 +330,47 @@ function parseVoice(text){
 /* ---------- 画面の骨組み ---------- */
 const TABS=[['in','入力','✍️'],['voice','音声','🎙'],['res','結果','📊'],['cmp','過去比較','📈'],['share','共有・設定','📤']];
 function renderTabs(){
-  const list = view.readonly? TABS.filter(t=>t[0]==='res'||t[0]==='cmp') : TABS;
+  const list = view.readonly? TABS.filter(t=>t[0]==='res'||t[0]==='cmp') : FARM_ID? TABS : [];
   document.getElementById('tabs').innerHTML = list.map(([k,l,i])=>`<button role="tab" aria-selected="${view.tab===k}" data-tab="${k}">${i}<br>${l}</button>`).join('');
 }
 function render(){
-  document.getElementById('title').textContent = (S.farmName? S.farmName+' ':'') + '現場モニタリング';
-  document.title = (S.farmName||'農家')+' 現場モニタリング';
-  const dEl=document.getElementById('date'); dEl.value=view.date; dEl.disabled=view.readonly;
+  if(!FARM_ID&&!view.readonly) view.tab='farm';
+  const fb=document.getElementById('farmBtn'); fb.disabled=view.readonly;
+  document.getElementById('title').textContent = view.readonly? (S.farmName||'農家')+' 現場モニタリング' : !FARM_ID? '農家を選ぶ' : (S.farmName||'（名前なし '+FARM_ID+'）');
+  document.title = (FARM_ID||view.readonly? (S.farmName||'農家')+' ' : '')+'現場モニタリング';
+  const dEl=document.getElementById('date'); dEl.value=view.date; dEl.disabled=view.readonly; dEl.classList.toggle('hide',view.tab==='farm');
   renderTabs();
   const m=document.getElementById('main');
-  m.innerHTML = ({in:vIn,voice:vVoice,res:vRes,cmp:vCmp,share:vShare}[view.tab]||vIn)();
+  m.innerHTML = ({in:vIn,voice:vVoice,res:vRes,cmp:vCmp,share:vShare,farm:vFarm}[view.tab]||vIn)();
   after();
 }
 document.getElementById('date').addEventListener('change',e=>{view.date=e.target.value||today();view.bcs=view.rf=null;render()});
+/* ---------- 農家を選ぶ・登録する ---------- */
+function vFarm(){
+  const L=farmList();
+  const list=L.length? L.map(f=>`<button class="btn" data-farm="${esc(f.id)}" aria-current="${f.id===FARM_ID}"><b>${esc(f.name||'（名前なし）')}</b>${f.id===FARM_ID?' <span class="muted">← 今の農家</span>':''}<br><span class="muted">記録 ${f.n}件${f.last?'・最後 '+f.last:''}${f.cows?'・個体情報 '+f.cows+'頭':''}</span></button>`).join('')
+    : '<p class="muted">まだ農家が登録されていません。下で登録してください。</p>';
+  return `<div class="card"><h2>農家を選ぶ</h2><div class="farmlist">${list}</div></div>
+  <div class="card"><h2>新しい農家を登録</h2><label for="newFarm">農家名</label>
+   <div class="row" style="flex-wrap:nowrap"><input type="text" id="newFarm" placeholder="例：○○牧場" autocomplete="off" enterkeyhint="done"><button class="btn primary" id="addFarm" style="white-space:nowrap">登録</button></div>
+   <p class="muted">記録・個体情報・目安は農家ごとに分けて、この端末の中に保存します（混ざりません）。名前はあとで「共有・設定」から直せます。</p></div>
+  ${FARM_ID? '<div class="row"><button class="btn" id="farmBack">← 戻る</button></div>':''}`;
+}
+document.getElementById('farmBtn').addEventListener('click',()=>{ if(view.readonly) return; view.tab='farm'; render(); window.scrollTo(0,0); });
+document.getElementById('main').addEventListener('click',e=>{
+  const fbtn=e.target.closest('[data-farm]'); if(fbtn){ switchFarm(fbtn.dataset.farm); return; }
+  const id=e.target.closest('button')&&e.target.closest('button').id;
+  if(id==='addFarm') addFarm(document.getElementById('newFarm').value);
+  if(id==='farmBack'){ view.tab='in'; render(); }
+  if(id==='delFarm'){
+    if(S.rows.length){ alert('記録が '+S.rows.length+' 件あるので消せません。'); return; }
+    if(!confirm('「'+(S.farmName||FARM_ID)+'」をこの端末から消します（記録は0件、個体情報・目安も消えます）。よいですか？')) return;
+    try{ localStorage.removeItem(KEY); if(lsGet(LAST)===FARM_ID) localStorage.removeItem(LAST); }catch(err){}
+    FARM_ID=null; KEY=null; S=blank(); try{ history.replaceState(null,'',location.pathname); }catch(err){} render();
+  }
+});
+document.getElementById('main').addEventListener('keydown',e=>{ if(e.target.id==='newFarm'&&e.key==='Enter'&&!e.isComposing){ e.preventDefault(); addFarm(e.target.value); } });
+
 document.getElementById('tabs').addEventListener('click',e=>{const b=e.target.closest('button');if(b){view.tab=b.dataset.tab;render();window.scrollTo(0,0)}});
 
 /* ---------- 入力 ---------- */
@@ -677,7 +737,8 @@ function vShare(){
    <div id="shmsg" class="muted" role="status"></div>
    <p class="muted">閲覧リンクは、この日と前回の記録を<b>リンクの中</b>に入れます（サーバーには置きません）。リンクを知っている人は見られるので、送り先は農家さん本人だけに。</p></div>
   <div class="card"><h2>設定</h2><div class="grid g2"><div><label>農家名</label><input type="text" id="farmName" value="${esc(S.farmName)}"></div><div><label>農家ID（保存先）</label><input type="text" value="${esc(FARM_ID)}" disabled></div></div>
-   <p class="muted">農家ごとに開くアドレスの末尾を <code>?farm=shirakawa</code> のようにすると、保存先が分かれて混ざりません。</p>
+   <p class="muted">農家の切り替え・登録は、上の 🏠 ボタンから。農家ごとに保存先が分かれて混ざりません。</p>
+   ${S.rows.length? '' : '<div class="row"><button class="btn small" id="delFarm">この農家を消す（記録0件のときだけ）</button></div>'}
    <h2 style="margin-top:12px">目安（仮置き・直せる）</h2>
    <div class="grid g2"><div><label>全体の帯 下（ステージ不明の牛）</label><input type="number" step="0.25" id="tBcsLo" value="${S.targets.bcs[0]}"></div><div><label>全体の帯 上</label><input type="number" step="0.25" id="tBcsHi" value="${S.targets.bcs[1]}"></div>
    <div><label>BCSが動いた印（±）</label><input type="number" step="0.25" id="tJump" value="${S.targets.bcsJump}"></div>
@@ -795,7 +856,8 @@ async function boot(){
       view.readonly=true; view.tab='res'; view.date=p.date;
       const bn=document.getElementById('banner'); bn.textContent='閲覧用（'+p.date+'）。この画面の内容は変更できません。'; bn.classList.remove('hide');
     }catch(err){ document.getElementById('main').innerHTML='<div class="card flag">リンクを読み取れませんでした。送り直してもらってください。</div>'; return; }
-  }
+  } else if(FARM_ID){ lsSet(LAST,FARM_ID); }        // ?farm= で開いた（前に作ったアイコン・リンク）
+  else { const last=cleanId(lsGet(LAST)); if(last&&lsGet(PFX+last)) { switchFarm(last); return; } }   // 前回の農家から始める。無ければ選ぶ画面
   render();
 }
 boot();
